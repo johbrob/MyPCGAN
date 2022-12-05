@@ -47,7 +47,7 @@ class Audio2Mel(nn.Module):
         # FFT Parameters                              #
         ##############################################
         window = torch.hann_window(win_length).float()
-        mel_basis = librosa_mel_fn(sampling_rate, n_fft, n_mel_channels, mel_fmin, mel_fmax)
+        mel_basis = librosa_mel_fn(sr=sampling_rate, n_fft=n_fft, n_mels=n_mel_channels, fmin=mel_fmin, fmax=mel_fmax)
         mel_basis = torch.from_numpy(mel_basis).float()
         self.register_buffer("mel_basis", mel_basis)
         self.register_buffer("window", window)
@@ -65,9 +65,8 @@ class Audio2Mel(nn.Module):
         # new_L = L/2 + 1
         # frames = ceil((L - (window_length - 1) - 1) / hop_length)
         fft = torch.stft(audio, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length,
-                         window=self.window, center=False)
-        real_part, imag_part = fft.unbind(-1)
-        magnitude = torch.sqrt(real_part ** 2 + imag_part ** 2)
+                         window=self.window, center=False,  return_complex=True)
+        magnitude = torch.sqrt(fft.real ** 2 + fft.imag ** 2)
         mel_output = torch.matmul(self.mel_basis, magnitude)
         log_mel_spec = torch.log10(torch.clamp(mel_output, min=1e-5))
         return log_mel_spec
@@ -77,7 +76,7 @@ class Audio2Mel(nn.Module):
 
     def output_shape(self, audio):
         padded_audio_length = audio.shape[-1] + 2 * self._get_pad_length()
-        return (self.n_mel_channels, int(np.ceil((padded_audio_length-self.win_length) // self.hop_length) + 1))
+        return self.n_mel_channels, int(np.ceil((padded_audio_length - self.win_length) // self.hop_length) + 1)
 
 
 class MelGanGenerator(nn.Module):
@@ -92,7 +91,7 @@ class MelGanGenerator(nn.Module):
         # Upsample to raw audio scale
         for i, r in enumerate(ratios):
             model += [nn.LeakyReLU(0.2), WNConvTranspose1d(mult * ngf, mult * ngf // 2, kernel_size=r * 2,
-                                                           stride=r, padding=r // 2 + r % 2, output_padding=r % 2,)]
+                                                           stride=r, padding=r // 2 + r % 2, output_padding=r % 2, )]
 
             for j in range(n_residual_layers):
                 model += [ResnetBlock(mult * ngf // 2, dilation=3 ** j)]

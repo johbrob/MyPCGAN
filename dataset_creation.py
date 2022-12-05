@@ -1,6 +1,7 @@
 import torch.nn.functional as F
 import local_vars
-import scipy as scipy
+# import scipy as scipy
+import scipy.io
 import pandas as pd
 import numpy as np
 import librosa
@@ -49,7 +50,7 @@ def _balanced_speaker_split(data, test_split_ratio):
 
 def _save_trimmed_and_padded_audio_files(annotations, sampling_rate, segment_length):
     audio_files = annotations['file'].to_numpy()
-    save_paths = annotations['save_path'].to_numpy()
+    save_paths = annotations['preprocessed_file'].to_numpy()
 
     for file, save_path in tqdm.tqdm(zip(audio_files, save_paths)):
         audio, sampling_rate = librosa.core.load(file, sr=sampling_rate)
