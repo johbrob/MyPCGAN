@@ -22,6 +22,9 @@ def _log_values(data, commit=True):
     wandb.log(data, commit=commit)
 
 
-def metrics(data, prefix, aggregation=np.mean, selectedKeys=None, commit=False):
+def metrics(data, prefix=None, suffix=None, aggregation=np.mean, selectedKeys=None, commit=False):
+    prefix = prefix + '-' if prefix else ''
+    suffix = '-' + suffix if suffix else ''
+
     targetKeys = selectedKeys if selectedKeys is not None else data.keys()
-    _log_values({"{}-{}".format(prefix, k): aggregation(data[k]) for k in targetKeys}, commit=commit)
+    _log_values({"{}{}{}".format(prefix, k, suffix): aggregation(data[k]) for k in targetKeys}, commit=commit)

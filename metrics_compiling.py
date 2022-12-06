@@ -1,42 +1,66 @@
+from sklearn.metrics import accuracy_score
+import numpy as np
 import torch
 
+def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
+                    secret_disc_output, losses):
+    filter_gen_metrics = {'distortion_loss': losses['filter_gen']['distortion'].detach().cpu().numpy(),
+                          'adversarial_loss': losses['filter_gen']['adversarial'].detach().cpu().numpy(),
+                          'combined_loss': losses['filter_gen']['final'].detach().cpu().numpy()}
 
-class MetricCompiler():
-    def __init__(self):
-        self.correct_FD = 0
-        self.correct_fake_GD = 0
-        self.correct_real_GD = 0
-        self.correct_gender_fake_GD = 0
-        self.correct_digit = 0
-        self.fixed_correct_gender = 0
+    secret_gen_metrics = {'distortion_loss': losses['secret_gen']['distortion'].detach().cpu().numpy(),
+                          'adversarial_loss': losses['secret_gen']['adversarial'].detach().cpu().numpy(),
+                          'combined_loss': losses['secret_gen']['final'].detach().cpu().numpy()}
 
-    def compute_metrics(self, pred_secret, gender, fake_pred_secret, real_pred_secret,
-                        fake_secret, gen_secret, pred_digit,
-                        digit, fixed_pred_secret):
-        # FD accuracy on original gender
-        predicted_gender_FD = torch.argmax(pred_secret, 1)
-        self.correct_FD += (predicted_gender_FD == gender.long()).sum()
+    # filter_disc
+    filtered_secret_preds_disc = torch.argmax(filter_disc_output['filtered_secret_score'], 1)
+    filtered_secret_accuracy_disc = accuracy_score(secret.cpu().numpy(), filtered_secret_preds_disc)
+    filter_disc_metrics = {'loss': losses['filter_disc']['final'].detach().cpu().numpy(),
+                           'accuracy': filtered_secret_accuracy_disc}
 
-        # GD accuracy on original gender in real and generated (fake) data,
-        # and sampled gender in generated (fake) data
-        predicted_fake_GD = torch.argmax(fake_pred_secret, 1)
-        predicted_real_GD = torch.argmax(real_pred_secret, 1)
+    # secret_disc
+    # print(secret_disc_output['fake_secret_score'].shape)
+    fake_secret_preds_disc = torch.argmax(secret_disc_output['fake_secret_score'], 1)
+    fake_secret_label_accuracy_disc = accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
+                                                     fake_secret_preds_disc)
+    real_secret_preds_disc = torch.argmax(secret_disc_output['real_secret_score'], 1)
+    real_secret_label_accuracy_disc = accuracy_score(secret.cpu().numpy(), fake_secret_preds_disc)
+    # generated_secret_accuracy_disc = accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
+    #                                                 fake_secret_preds_disc)
+    secret_disc_metrics = {'real_loss': losses['secret_disc']['real'].detach().cpu().numpy(),
+                           'fake_loss': losses['secret_disc']['fake'].detach().cpu().numpy(),
+                           'combined_loss': losses['secret_disc']['final'].detach().cpu().numpy(),
+                           'fake_accuracy': fake_secret_label_accuracy_disc,
+                           'real_accuracy': real_secret_label_accuracy_disc}
 
-        self.correct_fake_GD += (predicted_fake_GD == fake_secret).sum()
-        self.correct_real_GD += (predicted_real_GD == gender).sum()
-        self.correct_gender_fake_GD += (predicted_fake_GD == gen_secret).sum()
+    # label prediction
+    label_preds_disc = torch.argmax(secret_disc_output['label_score'].data, 1)
+    label_accuracy_disc = accuracy_score(label.cpu().numpy(), label_preds_disc)
+    label_prediction_metrics = {'accuracy': label_accuracy_disc}
 
-        # Calculate number of correct classifications for the fixed classifiers on the training set
-        predicted_digit = torch.argmax(pred_digit.data, 1)
-        self.correct_digit += (predicted_digit == digit).sum()
+    # print(filtered_secret_accuracy_disc, fake_secret_label_accuracy_disc, real_secret_label_accuracy_disc,
+    #       label_accuracy_disc)
+    # fixed_predicted = torch.argmax(fixed_pred_secret.data, 1)
+    # fixed_pred_secret_label = fixed_pred_secret_label.cpu().numpy()
+    # fixed_pred_secret_label_accuracy = accuracy_score(secret_label, fixed_pred_secret_label[:, 1])
 
-        fixed_predicted = torch.argmax(fixed_pred_secret.data, 1)
-        self.fixed_correct_gender += (fixed_predicted == gender.long()).sum()
+    return {'filter_gen': filter_gen_metrics, 'secret_gen': secret_gen_metrics, 'filter_disc': filter_disc_metrics,
+            'secret_disc': secret_disc_metrics, 'label_pred': label_prediction_metrics}
 
-    def reset(self):
-        self.correct_FD = 0
-        self.correct_fake_GD = 0
-        self.correct_real_GD = 0
-        self.correct_gender_fake_GD = 0
-        self.correct_digit = 0
-        self.fixed_correct_gender = 0
+
+def compile_metrics(metrics):
+    return {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric in
+            metric_dict.items()}
+
+
+def aggregate_metrics(batch_metrics, metrics):
+    for k, v in batch_metrics.items():
+        if k not in metrics:
+            metrics[k] = []
+        if isinstance(v, np.ndarray):
+            metrics[k].append(v.item())
+        elif not isinstance(v, (int, float)):
+            metrics[k].append(v)
+
+    return metrics
+

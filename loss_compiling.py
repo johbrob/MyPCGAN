@@ -2,11 +2,12 @@ from torch import LongTensor, FloatTensor
 from torch.autograd import Variable
 import torch
 
-class LossCompilingConfig():
+
+class LossComputeConfig:
     def __init__(self, lamb, eps, use_entropy_loss):
-        lamb = lamb
-        eps = eps
-        use_entropy_loss = use_entropy_loss
+        self.lamb = lamb
+        self.eps = eps
+        self.use_entropy_loss = use_entropy_loss
 
 
 class HLoss(torch.nn.Module):
@@ -19,44 +20,54 @@ class HLoss(torch.nn.Module):
         return b
 
 
-class LossCompiling():
-    def __init__(self, loss_compiling_config):
-        self.lamb = loss_compiling_config.lamb
-        self.eps = loss_compiling_config.eps
-        self.use_entropy_loss = loss_compiling_config.use_entropy_loss
+def _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output, loss_compute_config):
+    ones = Variable(FloatTensor(secret.shape).fill_(1.0), requires_grad=True).to(spectrograms.device)
+    target = ones - secret.float()
+    target = target.view(target.size(0))
+    distortion_loss = loss_funcs['distortion'](filter_gen_output['filtered_mel'], spectrograms)
 
-        self.distortion_loss = torch.nn.L1Loss()
-        self.entropy_loss = HLoss()
-        self.adversary_loss = torch.nn.CrossEntropyLoss()
-        self.adversary_rf_loss = torch.nn.CrossEntropyLoss()
+    if loss_compute_config.use_entropy_loss or True:
+        adversary_loss = loss_funcs['entropy'](filter_gen_output['filtered_secret_score'])
+    else:
+        adversary_loss = loss_funcs['adversarial'](filter_gen_output['filtered_secret_score'], target.long())
 
-    def for_filter_gen(self, spectrograms, filtered_mel, gender, pred_filtered_secret, use_entropy_loss, lamb, eps, device):
-        ones = Variable(FloatTensor(gender.shape).fill_(1.0), requires_grad=True).to(device)
-        target = ones - gender.float()
-        target = target.view(target.size(0))
-        distortion_loss = self.distortion_loss(filtered_mel, spectrograms)
+    final_loss = adversary_loss + loss_compute_config.lamb * torch.pow(
+        torch.relu(distortion_loss - loss_compute_config.eps), 2)
 
-        if use_entropy_loss:
-            adversary_loss = self.entropy_loss(pred_filtered_secret)
-        else:
-            adversary_loss = self.adversary_loss(pred_filtered_secret, target.long())
-
-        return adversary_loss + lamb * torch.pow(torch.relu(distortion_loss - eps), 2)
+    return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss}
 
 
-    def for_secret_gen(self, spectrograms, fake_secret, faked_mel, pred_faked_secret, lamb, eps):
-        distortion_loss = self.distortion_loss(faked_mel, spectrograms)
-        adversary_loss = self.adversary_loss(pred_faked_secret, fake_secret)
-        return adversary_loss + lamb * torch.pow(torch.relu(distortion_loss - eps), 2)
+def _compute_secret_gen_loss(loss_func, spectrograms, secret_gen_output, loss_compute_config):
+    distortion_loss = loss_func['distortion'](secret_gen_output['faked_mel'], spectrograms)
+    adversary_loss = loss_func['adversarial'](secret_gen_output['fake_secret_score'], secret_gen_output['fake_secret'])
+    final_loss = adversary_loss + loss_compute_config.lamb * torch.pow(
+        torch.relu(distortion_loss - loss_compute_config.eps), 2)
+
+    return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss}
 
 
-    def for_filter_disc(self, pred_filtered_secret, gender):
-        return self.adversary_loss(pred_filtered_secret, gender.long())
+def _compute_filter_disc_loss(loss_func, secret, filter_disc_output):
+    return {'final': loss_func['adversarial'](filter_disc_output['filtered_secret_score'], secret.long())}
 
 
-    def for_secret_disc(self, fake_pred_secret, real_pred_secret, gender, device):
-        fake_secret = Variable(LongTensor(fake_pred_secret.size(0)).fill_(2.0), requires_grad=False).to(device)
+def _compute_secret_disc_loss(loss_func, secret, secret_disc_output):
+    real_loss = loss_func['adversarial_rf'](secret_disc_output['real_secret_score'],
+                                          secret.long().to(secret_disc_output['fake_secret_score'].device)).to(
+        secret_disc_output['fake_secret_score'].device)
+    fake_loss = loss_func['adversarial'](secret_disc_output['fake_secret_score'], secret_disc_output['fake_secret']).to(
+        secret_disc_output['fake_secret_score'].device)
+    average_loss = (real_loss + fake_loss) / 2
 
-        real_loss = self.adversary_rf_loss(real_pred_secret, gender.long().to(device)).to(device)
-        fake_loss = self.adversary_rf_loss(fake_pred_secret, fake_secret).to(device)
-        return (real_loss + fake_loss) / 2
+    return {'real': real_loss, 'fake': fake_loss, 'final': average_loss}
+
+
+def compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output, secret_gen_output,
+                   secret_disc_output, loss_compute_config):
+    losses = {}
+    losses['filter_gen'] = _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output,
+                                                   loss_compute_config)
+    losses['secret_gen'] = _compute_secret_gen_loss(loss_funcs, spectrograms, secret_gen_output, loss_compute_config)
+    losses['filter_disc'] = _compute_filter_disc_loss(loss_funcs, secret, filter_disc_output)
+    losses['secret_disc'] = _compute_secret_disc_loss(loss_funcs, secret, secret_disc_output)
+
+    return losses

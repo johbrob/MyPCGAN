@@ -12,13 +12,13 @@ def set_mode(models, mode):
     frozen_model_counter = 0
     if mode == Mode.TRAIN:
         for name, model in models.items():
-            if name == 'digit_classifier' or name == 'gender_classifier':
+            if name == 'label_classifier' or name == 'secret_classifier':
                 frozen_model_counter += 1
             else:
                 model.train()
     elif mode == Mode.EVAL:
         for name, model in models.items():
-            if name == 'digit_classifier' or name == 'gender_classifier':
+            if name == 'label_classifier' or name == 'secret_classifier':
                 frozen_model_counter += 1
             else:
                 model.eval()
@@ -46,4 +46,4 @@ def step(optimizers):
 
 
 def backward(losses):
-    [loss.backward() for loss in losses.values()]
+    [loss['final'].backward() for loss in losses.values()]
