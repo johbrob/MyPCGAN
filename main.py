@@ -205,18 +205,24 @@ def save_test_samples(test_loader, audio2mel, mel2audio, models, losses, run_dir
     print("Success!")
 
 
-def init_training(training_config, device):
+def init_training(experiment_config, device):
+    training_config = experiment_config.training_config
+    audio2mel_config = experiment_config.audio2mel_config
+    mel2audio_config = experiment_config.mel2audio_config
+    unet_config = experiment_config.unet_config
+
     train_data, test_data = AudioDataset.load()
     train_loader = DataLoader(train_data, training_config.train_batch_size,
                               num_workers=training_config.train_num_workers, shuffle=True)
-    test_loader = DataLoader(test_data, training_config.test_batch_size,
-                             num_workers=training_config.test_num_workers)
+    test_loader = DataLoader(test_data, training_config.test_batch_size, num_workers=training_config.test_num_workers,
+                             shuffle=True)
 
-    audio2mel = Audio2Mel(training_config.n_fft, training_config.hop_length, training_config.win_length,
-                          training_config.sampling_rate, training_config.n_mels)
-    mel2audio = MelGanGenerator(training_config.n_mels, training_config.ngf, training_config.n_resnet_layers).to(device)
+    audio2mel = Audio2Mel(audio2mel_config.n_fft, audio2mel_config.hop_length, audio2mel_config.win_length,
+                          audio2mel_config.sampling_rate, audio2mel_config.n_mels)
+    mel2audio = MelGanGenerator(mel2audio_config.input_size, mel2audio_config.ngf,
+                                mel2audio_config.n_residual_layers).to(device)
 
-    label_classifier = load_modified_ResNet(train_data.n_genders).to(device)
+    label_classifier = load_modified_ResNet(train_data.n_labels).to(device)
     secret_classifier = load_modified_ResNet(train_data.n_genders).to(device)
 
     label_classifier.eval()
@@ -227,15 +233,15 @@ def init_training(training_config, device):
     loss_funcs = {'distortion': torch.nn.L1Loss(), 'entropy': HLoss(), 'adversarial': torch.nn.CrossEntropyLoss(),
                   'adversarial_rf': torch.nn.CrossEntropyLoss()}
 
-    filter_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=training_config.kernel_size,
-                            image_width=image_width, image_height=image_height, noise_dim=training_config.noise_dim,
-                            n_classes=train_data.n_genders, embedding_dim=training_config.embedding_dim,
-                            use_cond=False).to(device)
+    filter_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size,
+                            image_width=image_width, image_height=image_height, noise_dim=unet_config.noise_dim,
+                            n_classes=train_data.n_genders, embedding_dim=unet_config.embedding_dim, use_cond=False).to(
+        device)
     filter_disc = load_modified_AlexNet(train_data.n_genders).to(device)
-    secret_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=training_config.kernel_size,
-                            image_width=image_width, image_height=image_height, noise_dim=training_config.noise_dim,
-                            n_classes=train_data.n_genders, embedding_dim=training_config.embedding_dim,
-                            use_cond=False).to(device)
+    secret_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size,
+                            image_width=image_width, image_height=image_height, noise_dim=unet_config.noise_dim,
+                            n_classes=train_data.n_genders, embedding_dim=unet_config.embedding_dim, use_cond=False).to(
+        device)
     secret_disc = load_modified_AlexNet(train_data.n_genders + 1).to(device)
 
     models = {'filter_gen': filter_gen, 'filter_disc': filter_disc, 'secret_gen': secret_gen,
@@ -251,19 +257,16 @@ def init_training(training_config, device):
 
 
 def main():
-    sampling_rate = 8000
-    segment_length = 8192
     device = 'cpu'
+    experiment_config = configs.get_experiment_config_debug()
 
-    gradient_accumulation = 1
-    updates_per_evaluation = 1
+    # device = 'cuda:0'
+    # experiment_config = configs.get_experiment_config_fast_run()
 
-    save_interval = 1
-    checkpoint_interval = 1
+    device = torch.device(device)
+    training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config = experiment_config.get_configs()
 
-    training_config = configs.get_training_config_mini()
-    loss_compute_config = training_config.loss_compute_config
-    train_loader, test_loader, audio2mel, mel2audio, loss_funcs, models, optimizers = init_training(training_config,
+    train_loader, test_loader, audio2mel, mel2audio, loss_funcs, models, optimizers = init_training(experiment_config,
                                                                                                     device)
 
     ####################################
@@ -273,14 +276,14 @@ def main():
     #     yaml.dump(args, f)
     #     yaml.dump({'Seed used': manual_seed}, f)
     #     yaml.dump({'Run number': run}, f)
-    from torch.utils.tensorboard import SummaryWriter
+    # from torch.utils.tensorboard import SummaryWriter
     run_id = str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
     run_dir = local_vars.PWD + 'runs/audioMNIST/' + run_id
-    writer = SummaryWriter(run_dir)
+    # writer = SummaryWriter(run_dir)
     checkpoint_dir = os.path.join(run_dir, 'checkpoints')
     visuals_dir = os.path.join(run_dir, 'visuals')
 
-    log.init(vars(training_config))
+    log.init(vars(experiment_config))
 
     utils.zero_grad(optimizers)
     for epoch in range(0, 10):
@@ -290,10 +293,7 @@ def main():
         step_counter = 0
         for i, (input, secret, label, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
             step_counter += 1
-            # if i > 0:
-            #     print('breaking news')
-            #     break
-            # print('its going ok')
+
             label = label.to(device)
             secret = secret.to(device)
             input = torch.unsqueeze(input, 1)
@@ -313,13 +313,12 @@ def main():
             metrics = compile_metrics(metrics)
             log.metrics(metrics, suffix='train', commit=True)
 
-            # if step_counter % updates_per_evaluation == 0:
-            #     # val_metrics = evaluate_on_dataset(test_loader, audio2mel, models, loss_funcs, loss_compute_config,
-            #     #                                   device)
-            #     # print(val_metrics)
-            #     # log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
+            if step_counter % training_config.updates_per_evaluation == 0:
+                val_metrics = evaluate_on_dataset(test_loader, audio2mel, models, loss_funcs,
+                                                  loss_compute_config, device)
+                log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
 
-            if step_counter % gradient_accumulation == 0:
+            if step_counter % training_config.gradient_accumulation == 0:
                 utils.step(optimizers)
                 utils.zero_grad(optimizers)
             # print('__________________________________________________________________________')

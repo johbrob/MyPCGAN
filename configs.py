@@ -2,52 +2,90 @@ from loss_compiling import LossComputeConfig
 
 
 class TrainingConfig:
-    def __init__(self, train_batch_size, test_batch_size, train_num_workers, test_num_workers,
-                 n_mels, ngf, n_resnet_layers, kernel_size, lr, embedding_dim, noise_dim,
-                 n_fft, hop_length, win_length, sampling_rate, loss_compute_config):
+    def __init__(self, train_batch_size, test_batch_size, train_num_workers, test_num_workers, save_interval,
+                 checkpoint_interval, updates_per_evaluation, gradient_accumulation, lr):
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
         self.train_num_workers = train_num_workers
         self.test_num_workers = test_num_workers
-        self.n_mels = n_mels
-        self.ngf = ngf
-        self.n_resnet_layers = n_resnet_layers
-        self.kernel_size = kernel_size
-        self.embedding_dim = embedding_dim
-        self.noise_dim = noise_dim
+        self.save_interval = save_interval
+        self.checkpoint_interval = checkpoint_interval
+        self.updates_per_evaluation = updates_per_evaluation
+        self.gradient_accumulation = gradient_accumulation
         self.lr = lr
 
+
+class Audio2MelConfig:
+    def __init__(self, n_fft=1024, hop_length=256, win_length=1024, sampling_rate=22050, n_mels=80,
+                 mel_fmin=0.0, mel_fmax=None):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.win_length = win_length
         self.sampling_rate = sampling_rate
+        self.n_mels = n_mels
+        self.mel_fmin = mel_fmin
+        self.mel_fmax = mel_fmax
 
+
+class Mel2AudioConfig:
+    def __init__(self, input_size, ngf, n_residual_layers):
+        self.input_size = input_size
+        self.ngf = ngf
+        self.n_residual_layers = n_residual_layers
+
+
+class UnetConfig:
+    def __init__(self, kernel_size, embedding_dim, noise_dim):
+        self.kernel_size = kernel_size
+        self.embedding_dim = embedding_dim
+        self.noise_dim = noise_dim
+
+
+class ExperimentConfig:
+    def __init__(self, training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config):
+        self.training_config = training_config
+        self.audio2mel_config = audio2mel_config
+        self.mel2audio_config = mel2audio_config
+        self.unet_config = unet_config
         self.loss_compute_config = loss_compute_config
 
+    def get_configs(self):
+        return self.training_config, self.audio2mel_config, self.mel2audio_config, self.unet_config, self.loss_compute_config
 
-def get_training_config_mini():
-    num_genders = 2
-    num_digits = 10
-    batch_size = 128
-    sampling_rate = 8000
+
+def get_experiment_config_debug():
     segment_length = 8192
     device = 'cpu'
-
-    n_mel_channels = 80
-    ngf = 32
-    n_residual_layers = 3
-
-    # U-Net hparams
-    kernel_size = 3
-
-    save_interval = 1
-    checkpoint_interval = 1
 
     lr = {'filter_gen': 0.00001, 'filter_disc': 0.00001, 'secret_gen': 0.00001, 'secret_disc': 0.00001}
 
     loss_compute_config = LossComputeConfig(lamb=100, eps=1e-3, use_entropy_loss=False)
+    audio2mel_config = Audio2MelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
+    mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
+    unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
+    training_config = TrainingConfig(train_batch_size=8, test_batch_size=8, train_num_workers=1, test_num_workers=1,
+                                     save_interval=1, checkpoint_interval=1, updates_per_evaluation=1,
+                                     gradient_accumulation=1, lr=lr)
 
-    return TrainingConfig(train_batch_size=8, test_batch_size=1, train_num_workers=1, test_num_workers=1, n_mels=80,
-                          ngf=32, n_resnet_layers=3, kernel_size=3, lr=lr, embedding_dim=16, noise_dim=10,
-                          n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000,
-                          loss_compute_config=loss_compute_config)
+    return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
+                            mel2audio_config=mel2audio_config, unet_config=unet_config,
+                            loss_compute_config=loss_compute_config)
+
+
+def get_experiment_config_fast_run():
+    segment_length = 8192
+    device = 'cuda:0'
+
+    lr = {'filter_gen': 0.00001, 'filter_disc': 0.00001, 'secret_gen': 0.00001, 'secret_disc': 0.00001}
+
+    loss_compute_config = LossComputeConfig(lamb=100, eps=1e-3, use_entropy_loss=False)
+    audio2mel_config = Audio2MelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
+    mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
+    unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
+    training_config = TrainingConfig(train_batch_size=32, test_batch_size=32, train_num_workers=2, test_num_workers=2,
+                                     save_interval=-1, checkpoint_interval=-1, updates_per_evaluation=10,
+                                     gradient_accumulation=1, lr=lr)
+
+    return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
+                            mel2audio_config=mel2audio_config, unet_config=unet_config,
+                            loss_compute_config=loss_compute_config)
