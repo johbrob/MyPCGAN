@@ -14,17 +14,17 @@ def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret
 
     # filter_disc
     filtered_secret_preds_disc = torch.argmax(filter_disc_output['filtered_secret_score'], 1).cpu().numpy()
-    filtered_secret_accuracy_disc = accuracy_score(secret.cpu().numpy(), filtered_secret_preds_disc)
+    filtered_secret_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), filtered_secret_preds_disc))
     filter_disc_metrics = {'loss': losses['filter_disc']['final'].detach().cpu().numpy(),
                            'accuracy': filtered_secret_accuracy_disc}
 
     # secret_disc
     # print(secret_disc_output['fake_secret_score'].shape)
     fake_secret_preds_disc = torch.argmax(secret_disc_output['fake_secret_score'], 1).cpu().numpy()
-    fake_secret_label_accuracy_disc = accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
-                                                     fake_secret_preds_disc)
+    fake_secret_label_accuracy_disc = np.array(accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
+                                                     fake_secret_preds_disc))
     real_secret_preds_disc = torch.argmax(secret_disc_output['real_secret_score'], 1).cpu().numpy()
-    real_secret_label_accuracy_disc = accuracy_score(secret.cpu().numpy(), fake_secret_preds_disc)
+    real_secret_label_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), real_secret_preds_disc))
     # generated_secret_accuracy_disc = accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
     #                                                 fake_secret_preds_disc)
     secret_disc_metrics = {'real_loss': losses['secret_disc']['real'].detach().cpu().numpy(),
@@ -35,7 +35,7 @@ def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret
 
     # label prediction
     label_preds_disc = torch.argmax(secret_disc_output['label_score'].data, 1).cpu().numpy()
-    label_accuracy_disc = accuracy_score(label.cpu().numpy(), label_preds_disc)
+    label_accuracy_disc = np.array(accuracy_score(label.cpu().numpy(), label_preds_disc))
     label_prediction_metrics = {'accuracy': label_accuracy_disc}
 
     # print(filtered_secret_accuracy_disc, fake_secret_label_accuracy_disc, real_secret_label_accuracy_disc,
@@ -59,8 +59,8 @@ def aggregate_metrics(batch_metrics, metrics):
             metrics[k] = []
         if isinstance(v, np.ndarray):
             metrics[k].append(v.item())
-        elif not isinstance(v, (int, float)):
-            metrics[k].append(v)
+        else:
+            raise NotImplementedError(f'Unexpected format of metric: {k}, {v}')
 
     return metrics
 

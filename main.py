@@ -99,7 +99,7 @@ def evaluate_on_dataset(data_loader, audio2mel, models, loss_funcs, loss_compute
         batch_metrics = compile_metrics(batch_metrics)
         metrics = aggregate_metrics(batch_metrics, metrics)
 
-        return metrics
+    return metrics
 
 
 def save_test_samples(test_loader, audio2mel, mel2audio, models, losses, run_dir, epoch, sampling_rate, device):
