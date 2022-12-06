@@ -13,17 +13,17 @@ def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret
                           'combined_loss': losses['secret_gen']['final'].detach().cpu().numpy()}
 
     # filter_disc
-    filtered_secret_preds_disc = torch.argmax(filter_disc_output['filtered_secret_score'], 1)
+    filtered_secret_preds_disc = torch.argmax(filter_disc_output['filtered_secret_score'], 1).cpu().numpy()
     filtered_secret_accuracy_disc = accuracy_score(secret.cpu().numpy(), filtered_secret_preds_disc)
     filter_disc_metrics = {'loss': losses['filter_disc']['final'].detach().cpu().numpy(),
                            'accuracy': filtered_secret_accuracy_disc}
 
     # secret_disc
     # print(secret_disc_output['fake_secret_score'].shape)
-    fake_secret_preds_disc = torch.argmax(secret_disc_output['fake_secret_score'], 1)
+    fake_secret_preds_disc = torch.argmax(secret_disc_output['fake_secret_score'], 1).cpu().numpy()
     fake_secret_label_accuracy_disc = accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
                                                      fake_secret_preds_disc)
-    real_secret_preds_disc = torch.argmax(secret_disc_output['real_secret_score'], 1)
+    real_secret_preds_disc = torch.argmax(secret_disc_output['real_secret_score'], 1).cpu().numpy()
     real_secret_label_accuracy_disc = accuracy_score(secret.cpu().numpy(), fake_secret_preds_disc)
     # generated_secret_accuracy_disc = accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
     #                                                 fake_secret_preds_disc)
@@ -34,7 +34,7 @@ def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret
                            'real_accuracy': real_secret_label_accuracy_disc}
 
     # label prediction
-    label_preds_disc = torch.argmax(secret_disc_output['label_score'].data, 1)
+    label_preds_disc = torch.argmax(secret_disc_output['label_score'].data, 1).cpu().numpy()
     label_accuracy_disc = accuracy_score(label.cpu().numpy(), label_preds_disc)
     label_prediction_metrics = {'accuracy': label_accuracy_disc}
 
