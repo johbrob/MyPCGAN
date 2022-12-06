@@ -1,9 +1,9 @@
-
+from loss_compiling import LossCompilingConfig
 
 class TrainingConfig:
     def __init__(self, train_batch_size, test_batch_size, train_num_workers, test_num_workers,
                  n_mels, ngf, n_resnet_layers, kernel_size, lr, embedding_dim, noise_dim,
-                 n_fft, hop_length, win_length, sampling_rate):
+                 n_fft, hop_length, win_length, sampling_rate, loss_compiling_config):
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
         self.train_num_workers = train_num_workers
@@ -21,6 +21,8 @@ class TrainingConfig:
         self.win_length = win_length
         self.sampling_rate = sampling_rate
 
+        self.loss_compiling_config = loss_compiling_config
+
 
 def get_training_config_mini():
     num_genders = 2
@@ -37,14 +39,14 @@ def get_training_config_mini():
     # U-Net hparams
     kernel_size = 3
 
-    lamb = 100
-    eps = 1e-3
-    use_entropy_loss = False
-
     save_interval = 1
     checkpoint_interval = 1
 
     lr = {'filter_gen': 0.00001, 'filter_disc': 0.00001, 'secret_gen': 0.00001, 'secret_disc': 0.00001}
+
+    loss_compiling_config = LossCompilingConfig(lamb=100, eps=1e-3, use_entropy_loss=False)
+
     return TrainingConfig(train_batch_size=8, test_batch_size=1, train_num_workers=1, test_num_workers=1, n_mels=80,
                           ngf=32, n_resnet_layers=3, kernel_size=3, lr=lr, embedding_dim=16, noise_dim=10,
-                          n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000)
+                          n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000,
+                          loss_compiling_config=loss_compiling_config)

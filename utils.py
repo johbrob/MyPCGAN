@@ -35,3 +35,15 @@ def save_sample(file_path, sampling_rate, audio):
     file_path.parent.mkdir(parents=True, exist_ok=True)
     audio = (audio.numpy() * 32768).astype("int16")
     scipy.io.wavfile.write(file_path, sampling_rate, audio)
+
+
+def zero_grad(optimizers):
+    [optimizer.zero_grad() for optimizer in optimizers.values()]
+
+
+def step(optimizers):
+    [optimizer.step() for optimizer in optimizers.values()]
+
+
+def backward(losses):
+    [loss.backward() for loss in losses.values()]

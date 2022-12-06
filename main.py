@@ -48,6 +48,54 @@ def preprocess_spectrograms(spectrograms):
     return clipped_spectrograms, means, stds
 
 
+def compute_losses(spectrograms, filtered_mel, gender, pred_filtered_secret, fake_secret, faked_mel,
+                   pred_fake_secret, pred_real_secret, use_entropy_loss, lamb, eps,
+                   device):
+    import loss_compiling
+    losses = {}
+    losses['filter_gen'] = loss_computation.for_filter_gen(spectrograms, filtered_mel, gender, pred_filtered_secret,
+                                                           use_entropy_loss, lamb, eps, device)
+    losses['secret_gen'] = loss_computation.for_secret_gen(spectrograms, fake_secret, faked_mel, pred_fake_secret, lamb, eps)
+    losses['filter_disc'] = loss_computation.for_filter_disc(pred_filtered_secret, gender)
+    losses['secret_disc'] = loss_computation.for_secret_disc(pred_fake_secret, pred_real_secret, gender, device)
+
+    return losses
+
+
+def forward_pass(models, spectrograms, gender, device):
+    noise_dim = models['filter_gen'].noise_dim
+
+    filter_z = torch.randn(spectrograms.shape[0], noise_dim).to(device)
+    filtered_mel = models['filter_gen'](spectrograms, filter_z, gender.long())
+
+    pred_filtered_secret = models['filter_disc'](filtered_mel)
+
+    secret_z = torch.randn(spectrograms.shape[0], noise_dim).to(device)
+    fake_secret = Variable(LongTensor(np.random.choice([0.0, 1.0], spectrograms.shape[0]))).to(device)
+    faked_mel = models['secret_gen'](filtered_mel, secret_z, fake_secret)
+    pred_fake_secret = models['secret_disc'](faked_mel)
+    pred_real_secret = models['secret_disc'](spectrograms)
+    pred_digit = models['digit_classifier'](faked_mel)
+    fixed_pred_secret = models['gender_classifier'](faked_mel)
+
+    fake_secret = Variable(LongTensor(pred_fake_secret.size(0)).fill_(2.0), requires_grad=False).to(device)
+
+    return filtered_mel, pred_filtered_secret, fake_secret, faked_mel, pred_fake_secret, pred_real_secret, pred_digit, \
+           fixed_pred_secret, fake_secret
+
+def training_forward_pass(optimizers, models, spectrograms, gender, loss_compiler, device):
+    utils.zero_grad(optimizers)
+
+    filtered_mel, pred_filtered_secret, fake_secret, faked_mel, pred_fake_secret, pred_real_secret, pred_digit, \
+    fixed_pred_secret, fake_secret = forward_pass(models, spectrograms, gender, device)
+
+    losses = loss_compiler(spectrograms, filtered_mel, gender, pred_filtered_secret, fake_secret, faked_mel,
+                            pred_fake_secret, pred_real_secret)
+
+    utils.backward(losses)
+    utils.step(optimizers)
+
+
 def filter_gen_forward_pass(optimizers, models, spectrograms, gender, losses, use_entropy_loss, lamb,
                             eps, device):
     optimizers['filter_gen'].zero_grad()
@@ -161,8 +209,6 @@ def save_test_samples(test_loader, audio2mel, mel2audio, models, losses, run_dir
     example_audio_dir = os.path.join(example_dir, 'audio')
     example_spec_dir = os.path.join(example_dir, 'spectrograms')
 
-    # netF.eval()
-    # netG.eval()
     utils.set_mode(models, utils.Mode.EVAL)
 
     for i, (x, gender, digit, speaker_id) in tqdm.tqdm(enumerate(test_loader), total=len(test_loader)):
@@ -285,12 +331,12 @@ def init_training(training_config, device):
 
     filter_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=training_config.kernel_size,
                             image_width=image_width, image_height=image_height, noise_dim=training_config.noise_dim,
-                            nb_classes=train_data.n_genders, embedding_dim=training_config.embedding_dim,
+                            n_classes=train_data.n_genders, embedding_dim=training_config.embedding_dim,
                             use_cond=False).to(device)
     filter_disc = load_modified_AlexNet(train_data.n_genders).to(device)
     secret_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=training_config.kernel_size,
                             image_width=image_width, image_height=image_height, noise_dim=training_config.noise_dim,
-                            nb_classes=train_data.n_genders, embedding_dim=training_config.embedding_dim,
+                            n_classes=train_data.n_genders, embedding_dim=training_config.embedding_dim,
                             use_cond=False).to(device)
     secret_disc = load_modified_AlexNet(train_data.n_genders + 1).to(device)
 
@@ -319,6 +365,7 @@ def main():
     checkpoint_interval = 1
 
     training_config = configs.get_training_config_mini()
+    loss_compiling_config = training_config.loss_compiling_config
     train_loader, test_loader, audio2mel, mel2audio, losses, models, optimizers = init_training(training_config, device)
 
     ####################################
@@ -344,13 +391,13 @@ def main():
         metrics_compiler.reset()
 
         # Add variables to add batch losses to
-        F_distortion_loss_accum = 0
-        F_adversary_loss_accum = 0
-        FD_adversary_loss_accum = 0
-        G_distortion_loss_accum = 0
-        G_adversary_loss_accum = 0
-        GD_real_loss_accum = 0
-        GD_fake_loss_accum = 0
+        filter_gen_distortion_loss = 0
+        filter_gen_adversary_loss = 0
+        filter_disc_adversary_loss = 0
+        secret_gen_distortion_loss = 0
+        secret_gen_adversary_loss = 0
+        secret_disc_real_loss = 0
+        secret_disc_fake_loss = 0
 
         utils.set_mode(models, utils.Mode.TRAIN)
 
@@ -366,18 +413,20 @@ def main():
             spectrograms, means, stds = preprocess_spectrograms(spectrograms)
             spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
 
-            # Train filter_gen
-            filter_mel, pred_secret, filter_distortion_loss, filter_adversary_loss = \
-                filter_gen_forward_pass(optimizers, models, spectrograms, gender, losses, use_entropy_loss, lamb, eps,
-                                        device)
-            # Train secret_gen
-            gen_mel, gen_secret, pred_digit, fixed_pred_secret, secret_distortion_loss, secret_adversary_loss = \
-                secret_gen_forward_pass(optimizers, models, spectrograms, gender, losses, lamb, eps, device)
-            # Train filter_gen
-            pred_secret, filter_disc_loss = filter_disc_forward_pass(optimizers, models, filter_mel, gender, losses)
-            # Train secret_disc
-            real_pred_secret, fake_pred_secret, fake_secret, real_loss, fake_loss, secret_disc_loss = \
-                secret_disc_forward_pass(optimizers, models, spectrograms, gen_mel, gender, losses, device)
+            # # Train filter_gen
+            # filtered_mel, pred_filtered_secret, filter_gen_distortion_loss, filter_gen_adversary_loss = \
+            #     filter_gen_forward_pass(optimizers, models, spectrograms, gender, losses, use_entropy_loss, lamb, eps,
+            #                             device)
+            # # Train secret_gen
+            # faked_mel, fake_secret, pred_digit, fixed_pred_secret, secret_distortion_loss, secret_adversary_loss = \
+            #     secret_gen_forward_pass(optimizers, models, spectrograms, gender, losses, lamb, eps, device)
+            # # Train filter_gen
+            # pred_secret, filter_disc_loss = filter_disc_forward_pass(optimizers, models, filtered_mel, gender, losses)
+            # # Train secret_disc
+            # real_pred_secret, fake_pred_secret, fake_secret, real_loss, fake_loss, secret_disc_loss = \
+            #     secret_disc_forward_pass(optimizers, models, spectrograms, gen_mel, gender, losses, device)
+
+            training_forward_pass(optimizers, models, spectrograms, gender, loss_compiling_config, device)
 
             # Compute accuracies
             metrics_compiler.compute_metrics(pred_secret, gender, fake_pred_secret, real_pred_secret,
@@ -387,21 +436,27 @@ def main():
             #   Record losses
             # ----------------------------------------------
 
-            F_distortion_loss_accum += filter_distortion_loss.item()
-            F_adversary_loss_accum += filter_adversary_loss.item()
-            FD_adversary_loss_accum += filter_disc_loss.item()
-            G_distortion_loss_accum += secret_distortion_loss.item()
-            G_adversary_loss_accum += secret_adversary_loss.item()
-            GD_real_loss_accum += real_loss.item()
-            GD_fake_loss_accum += fake_loss.item()
+            filter_gen_distortion_loss = 0
+            filter_gen_adversary_loss = 0
+            filter_disc_adversary_loss = 0
+            secret_gen_distortion_loss = 0
+            secret_gen_adversary_loss = 0
+            secret_disc_real_loss = 0
+            secret_disc_fake_loss = 0
+            filter_gen_distortion_loss += filter_distortion_loss.item() / (i + 1)
+            F_adversary_loss_accum += filter_adversary_loss.item() / (i + 1)
+            FD_adversary_loss_accum += filter_disc_loss.item() / (i + 1)
+            G_distortion_loss_accum += secret_distortion_loss.item() / (i + 1)
+            G_adversary_loss_accum += secret_adversary_loss.item() / (i + 1)
+            GD_real_loss_accum += real_loss.item() / (i + 1)
+            GD_fake_loss_accum += fake_loss.item() / (i + 1)
 
-        writer.add_scalar("F_distortion_loss", F_distortion_loss_accum / (i + 1), epoch + 1)
-        writer.add_scalar("F_adversary_loss", F_adversary_loss_accum / (i + 1), epoch + 1)
-        writer.add_scalar("G_distortion_loss", G_distortion_loss_accum / (i + 1), epoch + 1)
-        writer.add_scalar("G_adversary_loss", G_adversary_loss_accum / (i + 1), epoch + 1)
-        writer.add_scalar("FD_adversary_loss", FD_adversary_loss_accum / (i + 1), epoch + 1)
-        writer.add_scalar("GD_real_loss", GD_real_loss_accum / (i + 1), epoch + 1)
-        writer.add_scalar("GD_fake_loss", GD_fake_loss_accum / (i + 1), epoch + 1)
+        # writer.add_scalar("F_adversary_loss", F_adversary_loss_accum / (i + 1), epoch + 1)
+        # writer.add_scalar("G_distortion_loss", G_distortion_loss_accum / (i + 1), epoch + 1)
+        # writer.add_scalar("G_adversary_loss", G_adversary_loss_accum / (i + 1), epoch + 1)
+        # writer.add_scalar("FD_adversary_loss", FD_adversary_loss_accum / (i + 1), epoch + 1)
+        # writer.add_scalar("GD_real_loss", GD_real_loss_accum / (i + 1), epoch + 1)
+        # writer.add_scalar("GD_fake_loss", GD_fake_loss_accum / (i + 1), epoch + 1)
 
         metrics2log = {'F_distortion_loss_accum': F_distortion_loss_accum}
         log.metrics(metrics2log, 'train')
