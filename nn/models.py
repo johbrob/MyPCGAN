@@ -44,17 +44,24 @@ def double_conv(channels_in, channels_out, kernel_size):
 
 class UNetFilter(nn.Module):
     def __init__(self, channels_in, channels_out, chs, kernel_size=3, image_width=64, image_height=64,
-                 noise_dim=10, activation='sigmoid', nb_classes=2, embedding_dim=16, use_cond=True):
+                 noise_dim=10, activation='sigmoid', n_classes=2, embedding_dim=16, use_cond=True):
         super().__init__()
         # chs = [2, 4, 8, 16, 32]
         # chs=[32, 64, 128, 256, 512]
-        self.use_cond = use_cond
-        self.width = image_width
-        self.height = image_height
-        self.activation = activation
-        self.embed_condition = nn.Embedding(nb_classes, embedding_dim)
-        self.d = 16
+        self.channels_in = channels_in
+        self.channels_out = channels_out
         self.chs = chs
+        self.kernel_size = kernel_size
+        self.image_width = image_width
+        self.image_height = image_height
+        self.noise_dim = noise_dim
+        self.activation = activation
+        self.n_classes = n_classes
+        self.embedding_dim = embedding_dim
+        self.use_cond = use_cond
+
+        self.embed_condition = nn.Embedding(n_classes, embedding_dim)
+        self.d = 16
 
         # noise projection layer
         self.project_noise = nn.Linear(noise_dim, (image_width // self.d) * (image_height // self.d) * chs[-1])
