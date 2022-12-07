@@ -87,3 +87,18 @@ def get_experiment_config_fast_run():
     return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
                             mel2audio_config=mel2audio_config, unet_config=unet_config,
                             loss_compute_config=loss_compute_config)
+
+
+def get_experiment_config_efficient_fast_run():
+    lr = {'filter_gen': 0.00001, 'filter_disc': 0.00001, 'secret_gen': 0.00001, 'secret_disc': 0.00001}
+    loss_compute_config = LossComputeConfig(lamb=100, eps=1e-3, use_entropy_loss=False)
+    audio2mel_config = Audio2MelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
+    mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
+    unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
+    training_config = TrainingConfig(run_name='PCGAN-fast_run', train_batch_size=32, test_batch_size=32, train_num_workers=2, test_num_workers=2,
+                                     save_interval=1000000000, checkpoint_interval=100000000, updates_per_evaluation=10,
+                                     gradient_accumulation=1, lr=lr, epochs=10, n_samples=10)
+
+    return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
+                            mel2audio_config=mel2audio_config, unet_config=unet_config,
+                            loss_compute_config=loss_compute_config)

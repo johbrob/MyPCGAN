@@ -230,10 +230,10 @@ def init_dirs(run_name):
 
 
 def main():
-    # device = 'cpu'
+    device = 'cpu'
     # experiment_config = configs.get_experiment_config_debug()
 
-    device = 'cuda:0'
+    # device = 'cuda:0'
     experiment_config = configs.get_experiment_config_fast_run()
 
     device = torch.device(device)
@@ -276,18 +276,24 @@ def main():
                 val_metrics = evaluate_on_dataset(test_loader, audio2mel, models, loss_funcs, loss_compute_config,
                                                   device)
                 log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
+                # print('evaluate', epoch, step_counter)
 
             if step_counter % training_config.gradient_accumulation == 0:
                 utils.step(optimizers)
                 utils.zero_grad(optimizers)
+                # print('gradient_accumulation', epoch, step_counter)
 
             if epoch % training_config.save_interval == 0:
                 print("Saving audio and spectrogram samples.")
                 save_test_samples(test_loader, audio2mel, mel2audio, models, loss_funcs, example_dirs, epoch,
                                   audio2mel_config.sampling_rate, device)
 
+                # print('save_samples', epoch, step_counter)
+
+
             if epoch % training_config.checkpoint_interval == 0:
                 utils.save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers)
+                print('make_checkpoints', epoch, step_counter)
 
 
 if __name__ == '__main__':
