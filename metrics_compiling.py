@@ -50,7 +50,7 @@ def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret
 
     return {'filter_gen': filter_gen_metrics, 'secret_gen': secret_gen_metrics,
             'filter_disc': filter_disc_metrics, 'secret_disc': secret_disc_metrics,
-            'label_pred': label_prediction_metrics, 'secret_pred': secret_prediction_metrics}
+            'alexNet_label_pred': label_prediction_metrics, 'alexNet_secret_pred': secret_prediction_metrics}
 
 
 def compile_metrics(metrics):
