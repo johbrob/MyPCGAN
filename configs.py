@@ -3,7 +3,7 @@ import numpy as np
 
 class TrainingConfig:
     def __init__(self, run_name, train_batch_size, test_batch_size, train_num_workers, test_num_workers, save_interval,
-                 checkpoint_interval, updates_per_evaluation, gradient_accumulation, lr, epochs):
+                 checkpoint_interval, updates_per_evaluation, gradient_accumulation, lr, epochs, n_samples):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
@@ -15,6 +15,7 @@ class TrainingConfig:
         self.gradient_accumulation = gradient_accumulation
         self.lr = lr
         self.epochs = epochs
+        self.n_samples = n_samples
 
     def random_id(self):
         return str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
@@ -66,7 +67,7 @@ def get_experiment_config_debug():
     unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
     training_config = TrainingConfig(run_name='PCGAN-debug', train_batch_size=8, test_batch_size=8, train_num_workers=1, test_num_workers=1,
                                      save_interval=1, checkpoint_interval=1, updates_per_evaluation=1,
-                                     gradient_accumulation=1, lr=lr, epochs=10)
+                                     gradient_accumulation=1, lr=lr, epochs=10, n_samples=10)
 
     return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
                             mel2audio_config=mel2audio_config, unet_config=unet_config,
@@ -80,8 +81,8 @@ def get_experiment_config_fast_run():
     mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
     unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
     training_config = TrainingConfig(run_name='PCGAN-fast_run', train_batch_size=32, test_batch_size=32, train_num_workers=2, test_num_workers=2,
-                                     save_interval=-1, checkpoint_interval=-1, updates_per_evaluation=10,
-                                     gradient_accumulation=1, lr=lr, epochs=10)
+                                     save_interval=20, checkpoint_interval=20, updates_per_evaluation=20,
+                                     gradient_accumulation=1, lr=lr, epochs=10, n_samples=10)
 
     return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
                             mel2audio_config=mel2audio_config, unet_config=unet_config,

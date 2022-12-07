@@ -230,11 +230,11 @@ def init_dirs(run_name):
 
 
 def main():
-    device = 'cpu'
-    experiment_config = configs.get_experiment_config_debug()
+    # device = 'cpu'
+    # experiment_config = configs.get_experiment_config_debug()
 
-    # device = 'cuda:0'
-    # experiment_config = configs.get_experiment_config_fast_run()
+    device = 'cuda:0'
+    experiment_config = configs.get_experiment_config_fast_run()
 
     device = torch.device(device)
     training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config = experiment_config.get_configs()
@@ -283,7 +283,7 @@ def main():
 
             if epoch % training_config.save_interval == 0:
                 print("Saving audio and spectrogram samples.")
-                save_test_samples(test_loader, audio2mel, mel2audio, models, losses, example_dirs, epoch,
+                save_test_samples(test_loader, audio2mel, mel2audio, models, loss_funcs, example_dirs, epoch,
                                   audio2mel_config.sampling_rate, device)
 
             if epoch % training_config.checkpoint_interval == 0:
