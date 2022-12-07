@@ -283,7 +283,7 @@ def main():
                 utils.zero_grad(optimizers)
                 # print('gradient_accumulation', epoch, step_counter)
 
-            if epoch % training_config.save_interval == 0:
+            if epoch % training_config.save_interval == 0 and step_counter == 1:
                 print("Saving audio and spectrogram samples.")
                 save_test_samples(test_loader, audio2mel, mel2audio, models, loss_funcs, example_dirs, epoch,
                                   audio2mel_config.sampling_rate, device)
@@ -291,7 +291,7 @@ def main():
                 # print('save_samples', epoch, step_counter)
 
 
-            if epoch % training_config.checkpoint_interval == 0:
+            if epoch % training_config.checkpoint_interval == 0 and step_counter == 1:
                 utils.save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers)
                 print('make_checkpoints', epoch, step_counter)
 
