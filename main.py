@@ -80,8 +80,7 @@ def evaluate_on_dataset(data_loader, audio2mel, models, loss_funcs, loss_compute
     metrics = {}
 
     for i, (input, secret, label, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
-        label = label.to(device)
-        secret = secret.to(device)
+        label, secret = label.to(device), secret.to(device)
         input = torch.unsqueeze(input, 1)
         spectrograms = audio2mel(input).detach()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
@@ -102,106 +101,62 @@ def evaluate_on_dataset(data_loader, audio2mel, models, loss_funcs, loss_compute
     return metrics
 
 
-def save_test_samples(test_loader, audio2mel, mel2audio, models, losses, run_dir, epoch, sampling_rate, device):
-    example_dir = os.path.join(run_dir, 'examples')
-    example_audio_dir = os.path.join(example_dir, 'audio')
-    example_spec_dir = os.path.join(example_dir, 'spectrograms')
-
+def save_test_samples(data_loader, audio2mel, mel2audio, models, loss_func, example_dirs, epoch, sampling_rate, device):
     utils.set_mode(models, utils.Mode.EVAL)
+    noise_dim = models['filter_gen'].noise_dim
 
-    for i, (x, gender, digit, speaker_id) in tqdm.tqdm(enumerate(test_loader), total=len(test_loader)):
-        if i % 50 == 0:
-            x = torch.unsqueeze(x, 1)
-            spectrograms = audio2mel(x).detach()
-            spec_original = spectrograms
-            spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-            spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
-            gender = gender.to(device)
-            digit = digit.to(device)
+    for i, (input, secret, label, id) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
+        input, secret, label, id = input[:1], secret[:1], label[:1], id[:1]
 
-            z1 = torch.randn(spectrograms.shape[0], 10).to(device)
-            filtered = models['filter_gen'](spectrograms, z1, gender.long()).detach()
+        label, secret = label.to(device), secret.to(device)
+        input = torch.unsqueeze(input, 1)
+        spectrograms = audio2mel(input).detach()
+        original_spectrograms = spectrograms.clone()
+        spectrograms, means, stds = preprocess_spectrograms(spectrograms)
+        spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
 
-            z2 = torch.randn(spectrograms.shape[0], 10).to(device)
-            male = Variable(LongTensor(spectrograms.size(0)).fill_(1.0), requires_grad=False).to(device)
-            female = Variable(LongTensor(spectrograms.size(0)).fill_(0.0), requires_grad=False).to(device)
-            generated_male = models['secret_gen'](filtered, z2, male).detach()
-            generated_female = models['secret_gen'](filtered, z2, female).detach()
+        # filter_gen
+        filter_z = torch.randn(spectrograms.shape[0], noise_dim).to(device)
+        filtered = models['filter_gen'](spectrograms, filter_z, secret.long()).detach()
 
-            # Predict digit
-            digit_male = models['label_classifier'](generated_male)
-            pred_digit_male = torch.argmax(digit_male.data, 1)
-            digit_female = models['label_classifier'](generated_female)
-            pred_digit_female = torch.argmax(digit_female.data, 1)
+        # secret_gen
+        secret_z = torch.randn(spectrograms.shape[0], noise_dim).to(device)
+        fake_secret_male = Variable(LongTensor(spectrograms.size(0)).fill_(1.0), requires_grad=False).to(device)
+        fake_secret_female = Variable(LongTensor(spectrograms.size(0)).fill_(0.0), requires_grad=False).to(device)
+        fake_mel_male = models['secret_gen'](filtered, secret_z, fake_secret_male).detach()
+        fake_mel_female = models['secret_gen'](filtered, secret_z, fake_secret_female).detach()
 
-            # Predict gender
-            gender_male = models['secret_classifier'](generated_male)
-            pred_gender_male = torch.argmax(gender_male.data, 1)
-            gender_female = models['secret_classifier'](generated_female)
-            pred_gender_female = torch.argmax(gender_female.data, 1)
+        # predict label
+        pred_label_male = torch.argmax(models['label_classifier'](fake_mel_male).data, 1)
+        pred_label_female = torch.argmax(models['label_classifier'](fake_mel_female).data, 1)
 
-            if pred_gender_male == 0:
-                pred_gender_male = 'female'
-            else:
-                pred_gender_male = 'male'
+        # predict secret
+        pred_secret_male = torch.argmax(models['secret_classifier'](fake_mel_male).data, 1)
+        pred_secret_female = torch.argmax(models['secret_classifier'](fake_mel_female).data, 1)
 
-            if pred_gender_female == 0:
-                pred_gender_female = 'female'
-            else:
-                pred_gender_female = 'male'
+        # distortions
+        filtered_distortion = loss_func['distortion'](spectrograms, filtered)
+        male_distortion = loss_func['distortion'](spectrograms, fake_mel_male).item()
+        female_distortion = loss_func['distortion'](spectrograms, fake_mel_female).item()
+        sample_distortion = loss_func['distortion'](fake_mel_male, fake_mel_female).item()
 
-            # Distortions
-            filtered_distortion = losses['distortion'](spectrograms, filtered)
-            male_distortion = losses['distortion'](spectrograms, generated_male).item()
-            female_distortion = losses['distortion'](spectrograms, generated_female).item()
-            sample_distortion = losses['distortion'](generated_male, generated_female).item()
+        unnormalized_filtered_mel = torch.squeeze(filtered, 1).to(device) * 3 * stds.to(device) + means.to(device)
+        unnormalized_fake_mel_male = torch.squeeze(fake_mel_male, 1).to(device) * 3 * stds.to(device) + means.to(device)
+        unnormalized_fake_mel_female = torch.squeeze(fake_mel_female, 1).to(device) * 3 * stds.to(device) + means.to(
+            device)
+        unnormalized_spectrograms = torch.squeeze(spectrograms.to(device) * 3 * stds.to(device) + means.to(device))
 
-            filtered = torch.squeeze(filtered, 1).to(device) * 3 * stds.to(device) + means.to(device)
-            generated_male = torch.squeeze(generated_male, 1).to(device) * 3 * stds.to(device) + means.to(
-                device)
-            generated_female = torch.squeeze(generated_female, 1).to(device) * 3 * stds.to(
-                device) + means.to(device)
-            spectrograms = spectrograms.to(device) * 3 * stds.to(device) + means.to(device)
+        filtered_audio = mel2audio(unnormalized_filtered_mel).squeeze().detach().cpu()
+        audio_male = mel2audio(unnormalized_fake_mel_male).squeeze().detach().cpu()
+        audio_female = mel2audio(unnormalized_fake_mel_female).squeeze().detach().cpu()
 
-            inverted_filtered = mel2audio(filtered).squeeze().detach().cpu()
-            inverted_male = mel2audio(generated_male).squeeze().detach().cpu()
-            inverted_female = mel2audio(generated_female).squeeze().detach().cpu()
+        utils.save_sample(example_dirs, id, label, epoch, pred_label_male, pred_label_female, filtered_audio,
+                          audio_male, audio_female, unnormalized_spectrograms, sampling_rate)
 
-            f_name_filtered_audio = os.path.join(example_audio_dir, 'speaker_{}_digit_{}_epoch_{}_filtered.wav'.format(
-                speaker_id.item(), digit.item(), epoch + 1))
-            f_name_male_audio = os.path.join(example_audio_dir,
-                                             'speaker_{}_digit_{}_epoch_{}_sampled_gender_male_predicted_digit_{}.wav'.format(
-                                                 speaker_id.item(), digit.item(), epoch + 1, pred_digit_male.item()))
-            f_name_female_audio = os.path.join(example_audio_dir,
-                                               'speaker_{}_digit_{}_epoch_{}_sampled_gender_female_predicted_digit_{}.wav'.format(
-                                                   speaker_id.item(), digit.item(), epoch + 1,
-                                                   pred_digit_female.item()))
-            f_name_original_audio = os.path.join(example_audio_dir,
-                                                 'speaker_{}_digit_{}_.wav'.format(speaker_id.item(), digit.item()))
-
-            utils.save_sample(f_name_filtered_audio, sampling_rate, inverted_filtered)
-            utils.save_sample(f_name_male_audio, sampling_rate, inverted_male)
-            utils.save_sample(f_name_female_audio, sampling_rate, inverted_female)
-            utils.save_sample(f_name_original_audio, sampling_rate, torch.squeeze(x))
-
-            if gender == 0:
-                gender_title = 'female'
-            else:
-                gender_title = 'male'
-            orig_title = 'Original spectrogram - Gender: {} - Digit: {}'.format(gender_title, digit.item())
-            filtered_title = 'Filtered spectrogram'
-            male_title = 'Sampled/predicted gender: male / {} | Predicted digit: {} \n Distortion loss: {:5.5f} (original) | {:5.5f} (female) ({}_loss)'.format(
-                pred_gender_male, pred_digit_male.item(), male_distortion, sample_distortion, 'l1')
-            female_title = 'Sampled/predicted gender: female / {} | Predicted digit: {} \n Distortion loss: {:5.5f} (original) | {:5.5f} (male) ({}_loss)'.format(
-                pred_gender_female, pred_digit_female.item(), female_distortion, sample_distortion,
-                'l1')
-            f_name = os.path.join(example_spec_dir, 'speaker_{}_digit_{}_epoch_{}'.format(
-                speaker_id.item(), digit.item(), epoch + 1
-            ))
-
-            Path(f_name).parent.mkdir(parents=True, exist_ok=True)
-            comparison_plot_pcgan(f_name, spec_original, filtered, generated_male, generated_female,
-                                  orig_title, filtered_title, male_title, female_title)
+        comparison_plot_pcgan(original_spectrograms, unnormalized_filtered_mel, unnormalized_fake_mel_male,
+                              unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
+                              pred_label_male, pred_label_female, male_distortion, female_distortion, sample_distortion,
+                              example_dirs, epoch, id)
     print("Success!")
 
 
@@ -256,6 +211,24 @@ def init_training(experiment_config, device):
     return train_loader, test_loader, audio2mel, mel2audio, loss_funcs, models, optimizers
 
 
+def init_dirs(run_name):
+    run_dir = local_vars.PWD + 'runs/audioMNIST/' + run_name
+    checkpoint_dir = os.path.join(run_dir, 'checkpoints')
+    samples_dir = os.path.join(run_dir, 'samples')
+
+    example_dir = os.path.join(run_dir, 'examples')
+    example_audio_dir = os.path.join(example_dir, 'audio')
+    example_spec_dir = os.path.join(example_dir, 'spectrograms')
+    example_dirs = {'audio': example_audio_dir, 'spec': example_spec_dir}
+
+    Path(checkpoint_dir).mkdir(parents=True, exist_ok=False)
+    Path(samples_dir).mkdir(parents=True, exist_ok=False)
+    Path(example_audio_dir).mkdir(parents=True, exist_ok=False)
+    Path(example_spec_dir).mkdir(parents=True, exist_ok=False)
+
+    return run_dir, checkpoint_dir, samples_dir, example_dirs
+
+
 def main():
     device = 'cpu'
     experiment_config = configs.get_experiment_config_debug()
@@ -265,28 +238,15 @@ def main():
 
     device = torch.device(device)
     training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config = experiment_config.get_configs()
-
     train_loader, test_loader, audio2mel, mel2audio, loss_funcs, models, optimizers = init_training(experiment_config,
                                                                                                     device)
-
-    ####################################
-    # Dump arguments and create logger #
-    ####################################
-    # with open(Path(run_dir) / "args.yml", "w") as f:
-    #     yaml.dump(args, f)
-    #     yaml.dump({'Seed used': manual_seed}, f)
-    #     yaml.dump({'Run number': run}, f)
-    # from torch.utils.tensorboard import SummaryWriter
-    run_id = str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
-    run_dir = local_vars.PWD + 'runs/audioMNIST/' + run_id
-    # writer = SummaryWriter(run_dir)
-    checkpoint_dir = os.path.join(run_dir, 'checkpoints')
-    visuals_dir = os.path.join(run_dir, 'visuals')
-
-    log.init(vars(experiment_config))
+    log.init(utils.nestedConfigs2dict(experiment_config), run_name=training_config.run_name)
+    run_dir, checkpoint_dir, samples_dir, example_dirs = init_dirs(training_config.run_name)
 
     utils.zero_grad(optimizers)
-    for epoch in range(0, 10):
+    save_epoch = 0
+    for epoch in range(0, training_config.epochs):
+        epoch = epoch + 1
         epoch_start = time.time()
 
         utils.set_mode(models, utils.Mode.TRAIN)
@@ -294,8 +254,7 @@ def main():
         for i, (input, secret, label, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
             step_counter += 1
 
-            label = label.to(device)
-            secret = secret.to(device)
+            label, secret = label.to(device), secret.to(device)
             input = torch.unsqueeze(input, 1)
             spectrograms = audio2mel(input).detach()
             spectrograms, means, stds = preprocess_spectrograms(spectrograms)
@@ -314,86 +273,21 @@ def main():
             log.metrics(metrics, suffix='train', commit=True)
 
             if step_counter % training_config.updates_per_evaluation == 0:
-                val_metrics = evaluate_on_dataset(test_loader, audio2mel, models, loss_funcs,
-                                                  loss_compute_config, device)
+                val_metrics = evaluate_on_dataset(test_loader, audio2mel, models, loss_funcs, loss_compute_config,
+                                                  device)
                 log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
 
             if step_counter % training_config.gradient_accumulation == 0:
                 utils.step(optimizers)
                 utils.zero_grad(optimizers)
-            # print('__________________________________________________________________________')
-            # print("Epoch {} completed | Time: {:5.2f} s ".format(epoch + 1, time.time() - epoch_start))
-            # print("filterGen    | Adversarial loss: {:5.5f} | Distortion loss: {:5.5f}".format(
-            #     F_adversary_loss_accum / (i + 1), F_distortion_loss_accum / (i + 1)))
-            # print("filterDisc   | Filtered sample accuracy: {} %".format(FD_accuracy))
-            # print(
-            #     "secretGen    | Advsarial loss: {:5.5f} | Distortion loss: {:5.5f}".format(
-            #         G_adversary_loss_accum / (i + 1),
-            #         G_distortion_loss_accum / (
-            #                 i + 1)))
-            # print("secretDisc   | Real samples: {} % | Fake samples: {} % | Sampled gender accuracy: {} % ".format(
-            #     GD_accuracy_real, GD_accuracy_fake, GD_accuracy_gender_fake))
-            # print("Fix Digit accuracy: {} % | Fix gender accuracy: {} %".format(fix_digit_spec_classfier_accuracy,
-            #                                                                     fix_gender_spec_classfier_accuracy))
-            # ----------------------------------------------
-            #   Compute test accuracy
-            # ----------------------------------------------
-            # if epoch % 10 == 0:
-            #     test_correct_digit, test_fixed_original_gender, test_fixed_sampled_gender = validate_on_dataset(
-            #         test_loader, audio2mel, models, device)
-            #
-            # test_digit_accuracy = 100 * test_correct_digit / len(test_loader.dataset)
-            # test_fixed_original_gender_accuracy_fake = 100 * test_fixed_original_gender / len(test_loader.dataset)
-            # test_fixed_sampled_gender_accuracy_fake = 100 * test_fixed_sampled_gender / len(test_loader.dataset)
-            # writer.add_scalar("test_set_digit_accuracy", test_digit_accuracy, epoch + 1)
-            # writer.add_scalar("test_set_fixed_original_gender_accuracy_fake",
-            #                   test_fixed_original_gender_accuracy_fake, epoch + 1)
-            # writer.add_scalar("test_set_fixed_sampled_gender_accuracy_fake",
-            #                   test_fixed_sampled_gender_accuracy_fake, epoch + 1)
-            #
-            # print('__________________________________________________________________________')
-            # print("## Test set statistics ##")
-            # print(
-            #     "Utility | Digit accuracy: {} % | Fixed sampled gender accuracy: {} % | Fixed original gender accuracy: {} % ".format(
-            #         test_digit_accuracy, test_fixed_sampled_gender_accuracy_fake,
-            #         test_fixed_original_gender_accuracy_fake))
-            #
-            # # ----------------------------------------------
-            # #   Save test samples
-            # # ----------------------------------------------
-            #
-            # Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
-            #
-            # if (epoch + 1) % save_interval == 0:
-            #     print("Saving audio and spectrogram samples.")
-            # save_test_samples(test_loader, audio2mel, mel2audio, models, losses, run_dir, epoch, sampling_rate,
-            #                   device)
-            #
-            # if (epoch + 1) % checkpoint_interval == 0:
-            #     save_epoch = epoch + 1
-            # old_checkpoints = sorted(glob.glob(os.path.join(checkpoint_dir, '*latest*')))
-            # if old_checkpoints:
-            #     for i, _ in enumerate(old_checkpoints):
-            #         os.remove(old_checkpoints[i])
 
-        for name, model in models:
-            if name == 'label_classifier' or name == 'secret_classifier':
-                continue
-            torch.save(model.state_dict(),
-                       os.path.join(checkpoint_dir, name + '_epoch_{}.pt'.format(save_epoch)))
-            torch.save(model.state_dict(),
-                       os.path.join(checkpoint_dir, name + '_latest_epoch_{}.pt'.format(save_epoch)))
+            if epoch % training_config.save_interval == 0:
+                print("Saving audio and spectrogram samples.")
+                save_test_samples(test_loader, audio2mel, mel2audio, models, losses, example_dirs, epoch,
+                                  audio2mel_config.sampling_rate, device)
 
-        for name, model in optimizers:
-            torch.save(model.state_dict(),
-                       os.path.join(checkpoint_dir, 'optimizer_' + name + '_epoch_{}.pt'.format(save_epoch)))
-            torch.save(model.state_dict(),
-                       os.path.join(checkpoint_dir,
-                                    'optimizer_' + name + '_latest_epoch_{}.pt'.format(save_epoch)))
-
-    run = 1
-    print("Run number {} completed.".format(run + 1))
-    print('__________________________________________________________________________')
+            if epoch % training_config.checkpoint_interval == 0:
+                utils.save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers)
 
 
 if __name__ == '__main__':

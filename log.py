@@ -3,15 +3,15 @@ import time
 import numpy as np
 
 
-def init(config_data, project='MyPCGAN', entity='johbrob', runName='tmp-{}', disabled=False,
-             add_timestamp_to_name=False):
+def init(config_data, project='MyPCGAN', entity='johbrob', run_name='tmp-{}', disabled=False,
+         add_timestamp_to_name=False):
     timestamp = time.time()
     config_data['model_ID'] = timestamp
 
-    runName = runName.format(timestamp) if add_timestamp_to_name else runName.format('')
+    run_name = run_name.format(timestamp) if add_timestamp_to_name else run_name.format('')
     mode = 'disabled' if disabled else None
 
-    wandb.init(name=runName, config=config_data, project=project, entity=entity, mode=mode)
+    wandb.init(name=run_name, config=config_data, project=project, entity=entity, mode=mode)
 
 
 def data(data):
