@@ -235,7 +235,8 @@ def main():
 
     device = 'cuda:0'
     # experiment_config = configs.get_experiment_config_fast_run()
-    experiment_config = configs.get_experiment_config_pcgan()
+    # experiment_config = configs.get_experiment_config_pcgan()
+    experiment_config = configs.get_experiment_config_low_lr_pcgan()
 
     device = torch.device(device)
     training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config = experiment_config.get_configs()

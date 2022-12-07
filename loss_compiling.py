@@ -21,7 +21,6 @@ class HLoss(torch.nn.Module):
 
 
 def _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output, loss_compute_config):
-    # ones = Variable(FloatTensor(secret.shape).fill_(1.0), requires_grad=True).to(spectrograms.device)
     ones = torch.ones(secret.shape, requires_grad=True, dtype=torch.float32).to(spectrograms.device)
     target = ones - secret.float()
     target = target.view(target.size(0))
