@@ -121,7 +121,7 @@ def get_experiment_config_pcgan():
     training_config = TrainingConfig(run_name='PCGAN-pcgan', train_batch_size=64, test_batch_size=64,
                                      train_num_workers=2, test_num_workers=2,
                                      save_interval=1, checkpoint_interval=1, updates_per_evaluation=5,
-                                     gradient_accumulation=2, lr=lr, epochs=2, n_samples=10)
+                                     gradient_accumulation=2, lr=lr, epochs=10, n_samples=10)
 
     return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
                             mel2audio_config=mel2audio_config, unet_config=unet_config,
@@ -141,7 +141,7 @@ def get_experiment_config_low_lr_pcgan():
     training_config = TrainingConfig(run_name='PCGAN-pcgan', train_batch_size=64, test_batch_size=64,
                                      train_num_workers=2, test_num_workers=2,
                                      save_interval=1, checkpoint_interval=1, updates_per_evaluation=5,
-                                     gradient_accumulation=2, lr=lr, epochs=2, n_samples=10)
+                                     gradient_accumulation=2, lr=lr, epochs=10, n_samples=10)
 
     return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
                             mel2audio_config=mel2audio_config, unet_config=unet_config,
