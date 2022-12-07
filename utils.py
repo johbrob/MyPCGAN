@@ -77,10 +77,10 @@ def save_sample(example_dirs, id, label, epoch, pred_label_male, pred_label_fema
     #                                        pred_label_female.item()))
     original_audio_file = os.path.join(example_dirs['audio'], speaker_digit_str)
 
-    save_audio_file(filtered_audio_file, sampling_rate, filtered_audio)
-    save_audio_file(male_audio_file, sampling_rate, audio_male)
-    save_audio_file(female_audio_file, sampling_rate, audio_female)
-    save_audio_file(original_audio_file, sampling_rate, original_audio)
+    save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.cpu())
+    save_audio_file(male_audio_file, sampling_rate, audio_male.cpu())
+    save_audio_file(female_audio_file, sampling_rate, audio_female.cpu())
+    save_audio_file(original_audio_file, sampling_rate, original_audio.cpu())
 
 
 def save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers):
