@@ -248,10 +248,10 @@ def init_dirs(run_name):
 
 
 def main():
-    device = 'cpu'
+    # device = 'cpu'
     # experiment_config = configs.get_experiment_config_debug()
 
-    # device = 'cuda:0'
+    device = 'cuda:0'
     # experiment_config = configs.get_experiment_config_fast_run()
     # experiment_config = configs.get_experiment_config_pcgan()
     experiment_config = configs.get_experiment_config_low_lr_pcgan()
