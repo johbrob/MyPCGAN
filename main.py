@@ -81,10 +81,10 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, lo
 
     metrics = {}
 
-    for i, (input, secret, label, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
+    for i, (input, secret, label, _, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
         label, secret = label.to(device), secret.to(device)
         input = torch.unsqueeze(input, 1)
-        spectrograms = audio_mel_converter(input).detach()
+        spectrograms = audio_mel_converter.audio2mel(input).detach()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
         spectrograms = spectrograms.to(device)
         # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
@@ -107,8 +107,9 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, lo
 def save_test_samples(data_loader, audio_mel_converter, models, loss_func, example_dirs, epoch, sampling_rate, device):
     utils.set_mode(models, utils.Mode.EVAL)
     noise_dim = models['filter_gen'].noise_dim
+    models['filter_gen'].to(device)
 
-    for i, (input, secret, label, id, audio_file) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
+    for i, (input, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
         input, secret, label, id = input[:1], secret[:1], label[:1], id[:1]
 
         label, secret = label.to(device), secret.to(device)
@@ -116,7 +117,7 @@ def save_test_samples(data_loader, audio_mel_converter, models, loss_func, examp
         spectrograms = audio_mel_converter.audio2mel(input).detach()
         original_spectrograms = spectrograms.clone()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-        spectrograms.to(device)
+        spectrograms = spectrograms.to(device)
         # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
 
         # filter_gen
@@ -272,7 +273,7 @@ def main():
 
         utils.set_mode(models, utils.Mode.TRAIN)
         step_counter = 0
-        for i, (input, secret, label, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
+        for i, (input, secret, label, _, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
             step_counter += 1
 
         label, secret = label.to(device), secret.to(device)

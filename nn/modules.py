@@ -137,25 +137,38 @@ class AudioMelConverter():
         #                                           n_mels=self.n_mels)
 
     def audio2mel(self, audio):
+        device = 'cpu'
         is_tensor = isinstance(audio, torch.Tensor)
-        audio = audio.numpy() if is_tensor else audio
+        if is_tensor:
+            device = audio.device
+            audio = audio.cpu().numpy()
+
         mel = melspectrogram(y=audio, sr=self.sample_rate, n_fft=self.n_fft, hop_length=self.hop_length,
                              win_length=self.win_length, center=False, n_mels=self.n_mels)
-        return torch.Tensor(mel) if is_tensor else mel
+        if is_tensor:
+            return torch.Tensor(mel).to(device)
+        else:
+            return mel
 
     def mel2audio(self, mel):
+        device = 'cpu'
         is_tensor = isinstance(mel, torch.Tensor)
-        mel = mel.numpy() if is_tensor else mel
+        if is_tensor:
+            device = mel.device
+            mel = mel.cpu().numpy()
         audio = mel_to_audio(M=mel, sr=self.sample_rate, n_fft=self.n_fft, hop_length=self.hop_length,
                              win_length=self.win_length, center=False)
-        return torch.Tensor(audio) if is_tensor else audio
+        if is_tensor:
+            return torch.Tensor(audio).to(device)
+        else:
+            return audio
 
     def _get_pad_length(self):
         return (self.n_fft - self.hop_length) // 2
 
     def output_shape(self, audio):
         padded_audio_length = audio.shape[-1] + 2 * self._get_pad_length()
-        return self.n_mels, int(np.ceil((padded_audio_length - self.win_length) // self.hop_length) + 1)
+        return self.n_mels, int(np.ceil((padded_audio_length - self.win_length) // self.hop_length) + 1) - 4
 
 # class Mel2Audio(nn.Module):
 #     def __init__(self, n_fft, sample_rate, win_length, hop_length, window_fn, normalized, center):
