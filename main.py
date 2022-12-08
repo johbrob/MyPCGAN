@@ -76,7 +76,7 @@ def forward_pass(models, input, secrets):
     return filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output
 
 
-def evaluate_on_dataset(data_loader, audio2mel, models, loss_funcs, loss_compute_config, device):
+def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, loss_compute_config, device):
     utils.set_mode(models, utils.Mode.EVAL)
 
     metrics = {}
@@ -84,9 +84,10 @@ def evaluate_on_dataset(data_loader, audio2mel, models, loss_funcs, loss_compute
     for i, (input, secret, label, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
         label, secret = label.to(device), secret.to(device)
         input = torch.unsqueeze(input, 1)
-        spectrograms = audio2mel(input).detach()
+        spectrograms = audio_mel_converter(input).detach()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-        spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+        spectrograms = spectrograms.to(device)
+        # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
 
         filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
                                                                                                     spectrograms,
@@ -103,7 +104,7 @@ def evaluate_on_dataset(data_loader, audio2mel, models, loss_funcs, loss_compute
     return metrics
 
 
-def save_test_samples(data_loader, audio2mel, mel2audio, models, loss_func, example_dirs, epoch, sampling_rate, device):
+def save_test_samples(data_loader, audio_mel_converter, models, loss_func, example_dirs, epoch, sampling_rate, device):
     utils.set_mode(models, utils.Mode.EVAL)
     noise_dim = models['filter_gen'].noise_dim
 
@@ -112,10 +113,11 @@ def save_test_samples(data_loader, audio2mel, mel2audio, models, loss_func, exam
 
         label, secret = label.to(device), secret.to(device)
         input = torch.unsqueeze(input, 1)
-        spectrograms = audio2mel(input).detach()
+        spectrograms = audio_mel_converter.audio2mel(input).detach()
         original_spectrograms = spectrograms.clone()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-        spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+        spectrograms.to(device)
+        # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
 
         # filter_gen
         filter_z = torch.randn(spectrograms.shape[0], noise_dim).to(device)
@@ -148,22 +150,12 @@ def save_test_samples(data_loader, audio2mel, mel2audio, models, loss_func, exam
             device)
         unnormalized_spectrograms = torch.squeeze(spectrograms.to(device) * 3 * stds.to(device) + means.to(device))
 
-        filtered_audio = mel2audio(unnormalized_filtered_mel).squeeze().detach().cpu()
-        audio_male = mel2audio(unnormalized_fake_mel_male).squeeze().detach().cpu()
-        audio_female = mel2audio(unnormalized_fake_mel_female).squeeze().detach().cpu()
+        filtered_audio = audio_mel_converter.mel2audio(unnormalized_filtered_mel).squeeze().detach().cpu()
+        audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male).squeeze().detach().cpu()
+        audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female).squeeze().detach().cpu()
 
         utils.save_sample(example_dirs, id, label, epoch, pred_label_male, pred_label_female, filtered_audio,
                           audio_male, audio_female, input.squeeze(), sampling_rate)
-
-        utils.save_audio_file(audio_file[0].replace('AudioMNIST', '3'), 8000, input.squeeze())
-        print(unnormalized_spectrograms.shape, input.shape)
-
-        a = librosa.feature.melspectrogram(y=input, n_fft=1024, hop_length=256, win_length=1024, sr=8000, n_mels=80)
-        b = librosa.feature.inverse.mel_to_audio(M=a, n_fft=1024, hop_length=256, win_length=1024, sr=8000, n_mels=80)
-        utils.save_audio_file(audio_file[0].replace('AudioMNIST', '5'), 8000, b.squeeze())
-        converted_input = mel2audio(audio2mel(input).detach()).squeeze().detach().cpu()
-        utils.save_audio_file(audio_file[0].replace('AudioMNIST', '4'), 8000, converted_input.squeeze())
-        utils.save_audio_file(audio_file[0].replace('AudioMNIST', '5'), 8000, filtered_audio.squeeze())
 
         comparison_plot_pcgan(original_spectrograms, unnormalized_filtered_mel, unnormalized_fake_mel_male,
                               unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
@@ -174,8 +166,7 @@ def save_test_samples(data_loader, audio2mel, mel2audio, models, loss_func, exam
 
 def init_training(experiment_config, device):
     training_config = experiment_config.training_config
-    audio2mel_config = experiment_config.audio2mel_config
-    mel2audio_config = experiment_config.mel2audio_config
+    audio_mel_config = experiment_config.audio_mel_config
     unet_config = experiment_config.unet_config
 
     train_data, test_data = AudioDataset.load()
@@ -202,7 +193,7 @@ def init_training(experiment_config, device):
     # mel2audio = lambda x: mel_to_audio(M=x, sr=audio2mel.sampling_rate, n_fft=audio2mel_config.n_fft,
     #                                      hop_length=audio2mel_config.hop_length, win_length=audio2mel_config.win_length,
     #                                      center=False, n_mels=audio2mel_config.n_mels)
-    audio_mel_converter = AudioMelConverter(audio2mel_config)
+    audio_mel_converter = AudioMelConverter(audio_mel_config)
     label_classifier = load_modified_ResNet(train_data.n_labels).to(device)
     secret_classifier = load_modified_ResNet(train_data.n_genders).to(device)
 
@@ -234,7 +225,7 @@ def init_training(experiment_config, device):
         'secret_gen': torch.optim.Adam(secret_gen.parameters(), training_config.lr['secret_gen'], betas=(0.5, 0.9)),
         'secret_disc': torch.optim.Adam(secret_disc.parameters(), training_config.lr['secret_disc'], betas=(0.5, 0.9))
     }
-    return train_loader, test_loader, audio2mel_config, loss_funcs, models, optimizers
+    return train_loader, test_loader, audio_mel_converter, loss_funcs, models, optimizers
 
 
 def init_dirs(run_name):
@@ -263,12 +254,12 @@ def main():
     # experiment_config = configs.get_experiment_config_fast_run()
     # experiment_config = configs.get_experiment_config_pcgan()
     experiment_config = configs.get_experiment_config_low_lr_pcgan()
-    do_log = False
+    do_log = True
 
     device = torch.device(device)
-    training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config = experiment_config.get_configs()
-    train_loader, test_loader, audio2mel, mel2audio, loss_funcs, models, optimizers = init_training(experiment_config,
-                                                                                                    device)
+    training_config, audio_mel_config, unet_config, loss_compute_config = experiment_config.get_configs()
+    train_loader, test_loader, audio_mel_converter, loss_funcs, models, optimizers = init_training(experiment_config,
+                                                                                                   device)
     if do_log:
         log.init(utils.nestedConfigs2dict(experiment_config), run_name=training_config.run_name)
     run_dir, checkpoint_dir, samples_dir, example_dirs = init_dirs(training_config.run_name)
@@ -281,42 +272,43 @@ def main():
 
         utils.set_mode(models, utils.Mode.TRAIN)
         step_counter = 0
-        # for i, (input, secret, label, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
-        #     step_counter += 1
+        for i, (input, secret, label, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
+            step_counter += 1
 
-        # label, secret = label.to(device), secret.to(device)
-        # input = torch.unsqueeze(input, 1)
-        # spectrograms = audio2mel(input).detach()
-        # spectrograms, means, stds = preprocess_spectrograms(spectrograms)
+        label, secret = label.to(device), secret.to(device)
+        input = torch.unsqueeze(input, 1)
+        spectrograms = audio_mel_converter.audio2mel(input).detach()
+        spectrograms, means, stds = preprocess_spectrograms(spectrograms)
+        spectrograms = spectrograms.to(device)
         # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
-        #
-        # filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
-        #                                                                                             spectrograms,
-        #                                                                                             secret)
-        # losses = compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output,
-        #                         secret_gen_output, secret_disc_output, loss_compute_config)
-        # utils.backward(losses)
-        #
-        # metrics = compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
-        #                           secret_disc_output, losses)
-        # metrics = compile_metrics(metrics)
-        # if do_log:
-        #     log.metrics(metrics, suffix='train', commit=True)
-        #
-        # if step_counter % training_config.updates_per_evaluation == 0:
-        #     val_metrics = evaluate_on_dataset(test_loader, audio2mel, models, loss_funcs, loss_compute_config,
-        #                                       device)
-        #     if do_log:
-        #         log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
-        #
-        # if step_counter % training_config.gradient_accumulation == 0:
-        #     utils.step(optimizers)
-        #     utils.zero_grad(optimizers)
+
+        filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
+                                                                                                    spectrograms,
+                                                                                                    secret)
+        losses = compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output,
+                                secret_gen_output, secret_disc_output, loss_compute_config)
+        utils.backward(losses)
+
+        metrics = compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
+                                  secret_disc_output, losses)
+        metrics = compile_metrics(metrics)
+        if do_log:
+            log.metrics(metrics, suffix='train', commit=True)
+
+        if step_counter % training_config.updates_per_evaluation == 0:
+            val_metrics = evaluate_on_dataset(test_loader, audio_mel_converter, models, loss_funcs, loss_compute_config,
+                                              device)
+            if do_log:
+                log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
+
+        if step_counter % training_config.gradient_accumulation == 0:
+            utils.step(optimizers)
+            utils.zero_grad(optimizers)
 
         if epoch % training_config.save_interval == 0:
             print("Saving audio and spectrogram samples.")
-            save_test_samples(test_loader, audio2mel, mel2audio, models, loss_funcs, example_dirs, epoch,
-                              audio2mel_config.sampling_rate, device)
+            save_test_samples(test_loader, audio_mel_converter, models, loss_funcs, example_dirs, epoch,
+                              audio_mel_config.sample_rate, device)
 
         if epoch % training_config.checkpoint_interval == 0:
             utils.save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers)

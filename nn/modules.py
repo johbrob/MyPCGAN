@@ -127,27 +127,35 @@ class AudioMelConverter():
         self.n_mels = audio_mel_config.n_mels
         self.center = audio_mel_config.center
 
-        self.audio2mel = lambda audio: melspectrogram(y=audio, sr=self.sample_rate, n_fft=self.n_fft,
-                                                      hop_length=self.hop_length,
-                                                      win_length=self.win_length,
-                                                      center=False, n_mels=self.n_mels)
-
-        self.mel2audio = lambda mel: mel_to_audio(M=mel, sr=self.sample_rate, n_fft=self.n_fft,
-                                                  hop_length=self.hop_length, win_length=self.win_length, center=False,
-                                                  n_mels=self.n_mels)
+        # self.audio2mel = lambda audio: melspectrogram(y=audio, sr=self.sample_rate, n_fft=self.n_fft,
+        #                                               hop_length=self.hop_length,
+        #                                               win_length=self.win_length,
+        #                                               center=False, n_mels=self.n_mels)
+        #
+        # self.mel2audio = lambda mel: mel_to_audio(M=mel, sr=self.sample_rate, n_fft=self.n_fft,
+        #                                           hop_length=self.hop_length, win_length=self.win_length, center=False,
+        #                                           n_mels=self.n_mels)
 
     def audio2mel(self, audio):
-        return torch.Tensor(self.audio2mel(audio.numpy()))
+        is_tensor = isinstance(audio, torch.Tensor)
+        audio = audio.numpy() if is_tensor else audio
+        mel = melspectrogram(y=audio, sr=self.sample_rate, n_fft=self.n_fft, hop_length=self.hop_length,
+                             win_length=self.win_length, center=False, n_mels=self.n_mels)
+        return torch.Tensor(mel) if is_tensor else mel
 
     def mel2audio(self, mel):
-        return torch.Tensor(self.mel2audio(mel.numpy()))
+        is_tensor = isinstance(mel, torch.Tensor)
+        mel = mel.numpy() if is_tensor else mel
+        audio = mel_to_audio(M=mel, sr=self.sample_rate, n_fft=self.n_fft, hop_length=self.hop_length,
+                             win_length=self.win_length, center=False)
+        return torch.Tensor(audio) if is_tensor else audio
 
     def _get_pad_length(self):
         return (self.n_fft - self.hop_length) // 2
 
     def output_shape(self, audio):
         padded_audio_length = audio.shape[-1] + 2 * self._get_pad_length()
-        return self.n_mel_channels, int(np.ceil((padded_audio_length - self.win_length) // self.hop_length) + 1)
+        return self.n_mels, int(np.ceil((padded_audio_length - self.win_length) // self.hop_length) + 1)
 
 # class Mel2Audio(nn.Module):
 #     def __init__(self, n_fft, sample_rate, win_length, hop_length, window_fn, normalized, center):

@@ -41,6 +41,19 @@ class Mel2AudioConfig:
         self.n_residual_layers = n_residual_layers
 
 
+class AudioMelConfig:
+    def __init__(self, n_fft=1024, hop_length=256, win_length=1024, sample_rate=22050, n_mels=80, center=False,
+                 mel_fmin=0.0, mel_fmax=None):
+        self.n_fft = n_fft
+        self.sample_rate = sample_rate
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.n_mels = n_mels
+        self.center = center
+        self.mel_fmin = mel_fmin
+        self.mel_fmax = mel_fmax
+
+
 class UnetConfig:
     def __init__(self, kernel_size, embedding_dim, noise_dim):
         self.kernel_size = kernel_size
@@ -49,15 +62,14 @@ class UnetConfig:
 
 
 class ExperimentConfig:
-    def __init__(self, training_config, audio2mel_config, mel2audio_config, unet_config, loss_compute_config):
+    def __init__(self, training_config, audio_mel_config, unet_config, loss_compute_config):
         self.training_config = training_config
-        self.audio2mel_config = audio2mel_config
-        self.mel2audio_config = mel2audio_config
+        self.audio_mel_config = audio_mel_config
         self.unet_config = unet_config
         self.loss_compute_config = loss_compute_config
 
     def get_configs(self):
-        return self.training_config, self.audio2mel_config, self.mel2audio_config, self.unet_config, self.loss_compute_config
+        return self.training_config, self.audio_mel_config, self.unet_config, self.loss_compute_config
 
 
 def get_experiment_config_debug():
@@ -115,7 +127,7 @@ def get_experiment_config_pcgan():
 
     lr = {'filter_gen': 0.0001, 'filter_disc': 0.0004, 'secret_gen': 0.0001, 'secret_disc': 0.0004}
     loss_compute_config = LossComputeConfig(lamb=100, eps=1e-3, use_entropy_loss=False)
-    audio2mel_config = Audio2MelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
+    audio2mel_config = AudioMelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
     mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
     unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
     training_config = TrainingConfig(run_name='PCGAN-pcgan', train_batch_size=64, test_batch_size=64,
@@ -135,14 +147,15 @@ def get_experiment_config_low_lr_pcgan():
 
     lr = {'filter_gen': 0.00001, 'filter_disc': 0.00004, 'secret_gen': 0.00001, 'secret_disc': 0.00004}
     loss_compute_config = LossComputeConfig(lamb=100, eps=1e-3, use_entropy_loss=False)
-    audio2mel_config = Audio2MelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
-    mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
+    # audio2mel_config = Audio2MelConfig(n_fft=1024, hop_length=256, win_length=1024, sampling_rate=8000, n_mels=80)
+    # mel2audio_config = Mel2AudioConfig(input_size=audio2mel_config.n_mels, ngf=32, n_residual_layers=3)
+    audio_mel_config = AudioMelConfig(n_fft=1024, hop_length=256, win_length=1024, sample_rate=8000, n_mels=80,
+                                      center=True)
     unet_config = UnetConfig(kernel_size=3, embedding_dim=16, noise_dim=10)
     training_config = TrainingConfig(run_name='PCGAN-pcgan', train_batch_size=64, test_batch_size=64,
                                      train_num_workers=2, test_num_workers=2,
                                      save_interval=1, checkpoint_interval=1, updates_per_evaluation=5,
                                      gradient_accumulation=2, lr=lr, epochs=10, n_samples=10)
 
-    return ExperimentConfig(training_config=training_config, audio2mel_config=audio2mel_config,
-                            mel2audio_config=mel2audio_config, unet_config=unet_config,
+    return ExperimentConfig(training_config=training_config, audio_mel_config=audio_mel_config, unet_config=unet_config,
                             loss_compute_config=loss_compute_config)
