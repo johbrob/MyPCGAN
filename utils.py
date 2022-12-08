@@ -39,8 +39,10 @@ def save_audio_file(file_path, sampling_rate, audio):
     elif not isinstance(file_path, Path):
         raise ValueError('File path must be either str or Path')
 
+    print(f"saving file to '{file_path}'. file is currently on {audio.device} with sampling rate {sampling_rate}")
+
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    audio = (audio.numpy() * 32768).astype("int16")
+    audio = (audio.cpu().numpy() * 32768).astype("int16")
     scipy.io.wavfile.write(file_path, sampling_rate, audio)
 
 
@@ -62,20 +64,21 @@ def nestedConfigs2dict(nested_config):
 
 def save_sample(example_dirs, id, label, epoch, pred_label_male, pred_label_female, filtered_audio, audio_male,
                 audio_female, original_audio, sampling_rate):
+
+    print('filtered_audio.shape', filtered_audio.shape)
+    print('filtered_audio.shape', audio_male.shape)
+    print('filtered_audio.shape', audio_female.shape)
+    print('filtered_audio.shape', original_audio.shape)
+
+
     speaker_digit_str = f'speaker_{id.item()}_digit_{label.item()}'
     speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
     build_str = lambda gender, digit: speaker_digit_epoch_str + f'_sampled_gender_{gender}_predicted_digit_{digit}.wav'
 
     filtered_audio_file = os.path.join(example_dirs['audio'], speaker_digit_epoch_str + '_filtered.wav')
-    male_audio_file = os.path.join(example_dirs['audio'], build_str('male', pred_label_male))
-    # f_name_male_audio = os.path.join(example_dirs['audio'],
-    #                                  sample_str + '_sampled_gender_male_predicted_digit_{}.wav'.format(
-    #                                      pred_label_male.item()))
-    female_audio_file = os.path.join(example_dirs['audio'], build_str('female', pred_label_female))
-    # f_name_female_audio = os.path.join(example_dirs['audio'],
-    #                                    sample_str + '_sampled_gender_female_predicted_digit_{}.wav'.format(
-    #                                        pred_label_female.item()))
-    original_audio_file = os.path.join(example_dirs['audio'], speaker_digit_str)
+    male_audio_file = os.path.join(example_dirs['audio'], build_str('male', pred_label_male.item()))
+    female_audio_file = os.path.join(example_dirs['audio'], build_str('female', pred_label_female.item()))
+    original_audio_file = os.path.join(example_dirs['audio'], speaker_digit_str + '.wav')
 
     save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.cpu())
     save_audio_file(male_audio_file, sampling_rate, audio_male.cpu())

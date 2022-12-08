@@ -1,3 +1,4 @@
+import utils
 from dataset_creation import create_audio_dataset
 from torch.utils.data import Dataset
 import pandas as pd
@@ -37,7 +38,7 @@ class AudioDataset(Dataset):
     def __getitem__(self, item):
         audio_file = self.audio_files[item]
         audio, sampling_rate = load_wav_to_torch(audio_file, self.sampling_rate)
-        return audio, self.gender_idx[item], self.labels[item], self.speaker_id[item]
+        return audio, self.gender_idx[item], self.labels[item], self.speaker_id[item], self.audio_files[item]
 
     def __len__(self):
         return len(self.audio_files)
