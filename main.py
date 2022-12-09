@@ -2,7 +2,7 @@ import librosa.feature
 from nn.models import load_modified_AlexNet, load_modified_ResNet, UNetFilter, AudioNet
 from DataManaging.AudioDatasets import AudioDataset
 # from nn.modules import Audio2Mel, MelGanGenerator, Mel2Audio, \
-from nn.modules import AudioMelConverter
+from nn.audio_mel import AudioMelConverter
 from metrics_compiling import compute_metrics, compile_metrics, aggregate_metrics
 from loss_compiling import compute_losses, HLoss
 from plotting import comparison_plot_pcgan
