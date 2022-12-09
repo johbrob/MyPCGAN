@@ -1,6 +1,6 @@
 from loss_compiling import LossConfig
 from nn.models import UnetConfig
-from nn.modules import AudioMelConfig
+from nn.audio_mel import AudioMelConfig
 from main import TrainingConfig
 
 
