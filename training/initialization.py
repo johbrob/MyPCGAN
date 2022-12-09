@@ -43,9 +43,9 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
     secret_classifier = load_modified_ResNet(n_genders).to(device).eval()
 
     label_classifier.load_state_dict(
-        torch.load(local_vars + 'nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt'))
+        torch.load(local_vars.PWD + 'nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt'))
     label_classifier.load_state_dict(
-        torch.load(local_vars + 'nn/pretrained_weights/best_gender_alexnet_epoch_29.pt'))
+        torch.load(local_vars.PWD + 'nn/pretrained_weights/best_gender_alexnet_epoch_29.pt'))
 
     loss_funcs = {'distortion': torch.nn.L1Loss(), 'entropy': HLoss(), 'adversarial': torch.nn.CrossEntropyLoss(),
                   'adversarial_rf': torch.nn.CrossEntropyLoss()}

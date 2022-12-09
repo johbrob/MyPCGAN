@@ -148,11 +148,11 @@ class CustomAudioMelConverter():
         self.mel_fmax = mel_fmax
 
         self.audio2mel_func = CustomAudio2Mel(n_fft=n_fft, hop_length=hop_length, win_length=win_length,
-                                         sampling_rate=sample_rate, n_mel_channels=n_mels, mel_fmin=mel_fmin,
-                                         mel_fmax=mel_fmax)
+                                              sampling_rate=sample_rate, n_mel_channels=n_mels, mel_fmin=mel_fmin,
+                                              mel_fmax=mel_fmax)
         self.mel2audio_func = CustomMel2Audio(10, ngf=32, n_residual_layers=3)
-        self.mel2audio_func.load_state_dict(torch.load(local_vars + 'nn/pretrained_weights/best_netG_epoch_2120.pt'))
-
+        self.mel2audio_func.load_state_dict(
+            torch.load(local_vars.PWD + 'nn/pretrained_weights/best_netG_epoch_2120.pt'))
 
     def audio2mel(self, audio):
         return self.audio2mel_func(audio)
