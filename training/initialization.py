@@ -14,7 +14,7 @@ import log
 
 class TrainingConfig:
     def __init__(self, lr, run_name='tmp', train_batch_size=128, test_batch_size=128, train_num_workers=2,
-                 test_num_workers=2, save_interval=1, checkpoint_interval=1, updates_per_evaluation=5,
+                 test_num_workers=2, save_interval=1, checkpoint_interval=1, updates_per_evaluation=50,
                  gradient_accumulation=1, epochs=2, n_samples=5, do_log=True, librosa_audio_mel=False):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
