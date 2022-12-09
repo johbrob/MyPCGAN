@@ -36,7 +36,7 @@ if __name__ == '__main__':
     if not torch.cuda.is_available() or args['gpu'] == 'no':
         device = torch.device('cpu')
     else:
-        device = torch.device(args['gpu'])
+        device = torch.device(int(args['gpu']))
 
     print("----------------------------------------------------------------")
     print(f" Start '{args['dataset']}' training with '{args['settings']}' setting on {device}")

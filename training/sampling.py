@@ -94,9 +94,10 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
             device)
         unnormalized_spectrograms = torch.squeeze(spectrograms.to(device) * 3 * stds.to(device) + means.to(device))
 
-        filtered_audio = audio_mel_converter.mel2audio(unnormalized_filtered_mel).squeeze().detach().cpu()
-        audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male).squeeze().detach().cpu()
-        audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female).squeeze().detach().cpu()
+        # TODO: These could be on gpu if we use MelGAnGenerator
+        filtered_audio = audio_mel_converter.mel2audio(unnormalized_filtered_mel.squeeze().detach().cpu())
+        audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male.squeeze().detach().cpu())
+        audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female.squeeze().detach().cpu())
 
         utils.save_sample(utils.create_run_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
                           pred_label_female, filtered_audio, audio_male, audio_female, input.squeeze(), sampling_rate)
