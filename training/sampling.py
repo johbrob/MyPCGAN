@@ -99,11 +99,11 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
         audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male.squeeze().detach().cpu())
         audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female.squeeze().detach().cpu())
 
-        utils.save_sample(utils.create_run_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
+        utils.save_sample(utils.create_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
                           pred_label_female, filtered_audio, audio_male, audio_female, input.squeeze(), sampling_rate)
 
         comparison_plot_pcgan(original_spectrograms, unnormalized_filtered_mel, unnormalized_fake_mel_male,
                               unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
                               pred_label_male, pred_label_female, male_distortion, female_distortion, sample_distortion,
-                              utils.create_run_subdir(example_dir, 'spectrograms'), epoch, id)
+                              utils.create_subdir(example_dir, 'spectrograms'), epoch, id)
     print("Success!")

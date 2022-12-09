@@ -77,7 +77,6 @@ def save_audio_file(file_path, sampling_rate, audio):
 
 def save_sample(save_dir, id, label, epoch, pred_label_male, pred_label_female, filtered_audio, audio_male,
                 audio_female, original_audio, sampling_rate):
-
     speaker_digit_str = f'speaker_{id.item()}_digit_{label.item()}'
     speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
     build_str = lambda gender, digit: speaker_digit_epoch_str + f'_sampled_gender_{gender}_predicted_digit_{digit}.wav'
@@ -102,11 +101,15 @@ def get_run_dir(run_name):
 
 
 def create_run_subdir(run_name, sub_dir_name):
-    return str(Path(os.path.join(get_run_dir(run_name), sub_dir_name)).mkdir(parents=True, exist_ok=False))
+    path = os.path.join(get_run_dir(run_name), sub_dir_name)
+    Path(path).mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def create_subdir(dir, sub_dir_name):
-    return str(Path(os.path.join(dir, sub_dir_name)).mkdir(parents=True, exist_ok=False))
+    path = os.path.join(dir, sub_dir_name)
+    Path(path).mkdir(parents=True, exist_ok=True)
+    return path
 
 
 # ----------- Other stuff -----------
