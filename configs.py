@@ -1,7 +1,7 @@
 from loss_compiling import LossConfig
 from nn.models import UnetConfig
 from nn.audio_mel import AudioMelConfig
-from main import TrainingConfig
+from training.initialization import TrainingConfig
 
 
 class ExperimentConfig:
