@@ -1,7 +1,8 @@
-import argparse
 from DataManaging import AvailableDatasets
-import configs
 from training import init_training
+import argparse
+import configs
+import torch
 
 available_dataset = {
     'audiomnist': AvailableDatasets.AudioMNIST
@@ -24,13 +25,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", help="name of dataset")
     parser.add_argument("-s", "--settings", help="which pre-defined setting to use", default='debug')
-    parser.add_argument("-g", "--gpu", help="specify which gpu to use. Will use cpu if no gpu is available",
-                        default='0')
+    parser.add_argument("-g", "--gpu", help="specify which gpu to use. Enter 'no' to use cpu. "
+                                            "Will also use cpu if no gpu is available", default='0')
     args = parser.parse_args()
     args = vars(args)
 
     args = {'dataset': 'audiomnist', 'settings': 'debug', 'gpu': 0}
     verify_args(args)
 
+    if not torch.cuda.is_available() or args['gpu'] == 'no':
+        device = torch.device('cpu')
+    else:
+        device = torch.device(args['gpu'])
+
+    print("----------------------------------------------------------------")
+    print(f" Start '{args['dataset']}' training with '{args['settings']}' setting on {device}")
+    print("----------------------------------------------------------------")
+
     init_training(dataset_name=available_dataset[args['dataset']],
-                  experiment_settings=available_settings[args['settings']], device=args['gpu'])
+                  experiment_settings=available_settings[args['settings']], device=device)

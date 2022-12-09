@@ -80,11 +80,6 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
 
 
 def init_training(dataset_name, experiment_settings, device):
-    if torch.cuda.is_available():
-        device = torch.device(device)
-    else:
-        device = torch.device('cpu')
-
     training_config, audio_mel_config, unet_config, loss_config = experiment_settings.get_configs()
 
     train_data, test_data = AudioDataset.load()
