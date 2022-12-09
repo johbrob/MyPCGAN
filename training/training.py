@@ -58,7 +58,8 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
 
         utils.set_mode(models, utils.Mode.TRAIN)
         step_counter = 0
-        for i, (audio, secret, label, _, _) in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
+        for i, (audio, secret, label, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
+                                                         total=len(train_loader)):
             step_counter += 1
 
             label, secret = label.to(device), secret.to(device)
@@ -94,9 +95,9 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
 
         if epoch % training_config.save_interval == 0:
             print("Saving audio and spectrogram samples.")
-            save_test_samples(utils.create_run_subdir(training_config.run_name, 'samples'), test_loader, audio_mel_converter,
+            save_test_samples(utils.create_run_subdir(training_config.run_name, 'samples'), test_loader,
+                              audio_mel_converter,
                               models, loss_funcs, epoch, sample_rate, device)
-
 
         if epoch % training_config.checkpoint_interval == 0:
             utils.save_models_and_optimizers(utils.create_run_subdir(training_config.run_name, 'checkpoints'),
@@ -108,7 +109,7 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, ga
 
     metrics = {}
 
-    for i, (input, secret, label, _, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
+    for i, (input, secret, label, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
         label, secret = label.to(device), secret.to(device)
         input = torch.unsqueeze(input, 1)
         spectrograms = audio_mel_converter.audio2mel(input).detach()

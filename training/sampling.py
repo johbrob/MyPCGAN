@@ -50,7 +50,7 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
     noise_dim = models['filter_gen'].noise_dim
     models['filter_gen'].to(device)
 
-    for i, (input, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader)):
+    for i, (input, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples', total=len(data_loader)):
         input, secret, label, id = input[:1], secret[:1], label[:1], id[:1]
 
         label, secret = label.to(device), secret.to(device)

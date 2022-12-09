@@ -87,10 +87,10 @@ def save_sample(save_dir, id, label, epoch, pred_label_male, pred_label_female, 
     female_audio_file = os.path.join(save_dir, build_str('female', pred_label_female.item()))
     original_audio_file = os.path.join(save_dir, speaker_digit_str + '.wav')
 
-    save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.cpu())
-    save_audio_file(male_audio_file, sampling_rate, audio_male.cpu())
-    save_audio_file(female_audio_file, sampling_rate, audio_female.cpu())
-    save_audio_file(original_audio_file, sampling_rate, original_audio.cpu())
+    save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.detach().cpu())
+    save_audio_file(male_audio_file, sampling_rate, audio_male.detach().cpu())
+    save_audio_file(female_audio_file, sampling_rate, audio_female.detach().cpu())
+    save_audio_file(original_audio_file, sampling_rate, original_audio.detach().cpu())
 
 
 
