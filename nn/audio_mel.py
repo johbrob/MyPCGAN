@@ -136,23 +136,24 @@ class CustomMel2Audio(nn.Module):
 
 
 class CustomAudioMelConverter():
-    def __init__(self, n_fft=1024, hop_length=256, win_length=1024, sample_rate=22050, n_mels=80, center=False,
-                 mel_fmin=0.0, mel_fmax=None):
-        self.n_fft = n_fft
-        self.sample_rate = sample_rate
-        self.hop_length = hop_length
-        self.win_length = win_length
-        self.n_mels = n_mels
-        self.center = center
-        self.mel_fmin = mel_fmin
-        self.mel_fmax = mel_fmax
+    def __init__(self, audio_mel_config):
+        self.n_fft = audio_mel_config.n_fft
+        self.sample_rate = audio_mel_config.sample_rate
+        self.hop_length = audio_mel_config.hop_length
+        self.win_length = audio_mel_config.win_length
+        self.n_mels = audio_mel_config.n_mels
+        self.center = audio_mel_config.center
+        self.mel_fmin = audio_mel_config.mel_fmin
+        self.mel_fmax = audio_mel_config.mel_fmax
 
-        self.audio2mel_func = CustomAudio2Mel(n_fft=n_fft, hop_length=hop_length, win_length=win_length,
-                                              sampling_rate=sample_rate, n_mel_channels=n_mels, mel_fmin=mel_fmin,
-                                              mel_fmax=mel_fmax)
-        self.mel2audio_func = CustomMel2Audio(10, ngf=32, n_residual_layers=3)
+        self.audio2mel_func = CustomAudio2Mel(n_fft=audio_mel_config.n_fft, hop_length=audio_mel_config.hop_length,
+                                              win_length=audio_mel_config.win_length,
+                                              sampling_rate=audio_mel_config.sample_rate,
+                                              n_mel_channels=audio_mel_config.n_mels,
+                                              mel_fmin=audio_mel_config.mel_fmin, mel_fmax=audio_mel_config.mel_fmax)
+        self.mel2audio_func = CustomMel2Audio(audio_mel_config.n_mels, ngf=32, n_residual_layers=3)
         self.mel2audio_func.load_state_dict(
-            torch.load(local_vars.PWD + 'nn/pretrained_weights/best_netG_epoch_2120.pt'))
+            torch.load(local_vars.PWD + 'nn/pretrained_weights/best_netG_epoch_2120.pt', map_location=torch.device('cpu')))
 
     def audio2mel(self, audio):
         return self.audio2mel_func(audio)

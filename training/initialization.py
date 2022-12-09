@@ -15,7 +15,7 @@ import log
 class TrainingConfig:
     def __init__(self, lr, run_name='tmp', train_batch_size=128, test_batch_size=128, train_num_workers=2,
                  test_num_workers=2, save_interval=1, checkpoint_interval=1, updates_per_evaluation=5,
-                 gradient_accumulation=1, epochs=2, n_samples=5, do_log=True, librosa_audio_mel=True):
+                 gradient_accumulation=1, epochs=2, n_samples=5, do_log=True, librosa_audio_mel=False):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
@@ -42,10 +42,14 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
     label_classifier = load_modified_ResNet(n_labels).to(device).eval()
     secret_classifier = load_modified_ResNet(n_genders).to(device).eval()
 
-    label_classifier.load_state_dict(
-        torch.load(local_vars.PWD + 'nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt'))
-    label_classifier.load_state_dict(
-        torch.load(local_vars.PWD + 'nn/pretrained_weights/best_gender_alexnet_epoch_29.pt'))
+    # TODO: Fix loading state dicts
+    # tmp_lc = torch.load(local_vars.PWD + 'nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
+    #                     map_location=torch.device('cpu'))
+    # label_classifier.load_state_dict(tmp_lc)
+    #
+    # secret_classifier.load_state_dict(
+    #     torch.load(local_vars.PWD + 'nn/pretrained_weights/best_gender_alexnet_epoch_29.pt'),
+    #     map_location=torch.device('cpu'))
 
     loss_funcs = {'distortion': torch.nn.L1Loss(), 'entropy': HLoss(), 'adversarial': torch.nn.CrossEntropyLoss(),
                   'adversarial_rf': torch.nn.CrossEntropyLoss()}

@@ -13,12 +13,12 @@ from torch.autograd import Variable
 from torch import LongTensor
 
 
-def forward_pass(models, input, secrets):
+def forward_pass(models, audio, secrets):
     noise_dim = models['filter_gen'].noise_dim
 
     # filter_gen
-    filter_z = torch.randn(input.shape[0], noise_dim).to(input.device)
-    filtered_mel = models['filter_gen'](input, filter_z, secrets.long())
+    filter_z = torch.randn(audio.shape[0], noise_dim).to(audio.device)
+    filtered_mel = models['filter_gen'](audio, filter_z, secrets.long())
     filtered_secret_preds_gen = models['filter_disc'](filtered_mel)
     filter_gen_output = {'filtered_mel': filtered_mel, 'filtered_secret_score': filtered_secret_preds_gen}
 
@@ -27,8 +27,8 @@ def forward_pass(models, input, secrets):
     filter_disc_output = {'filtered_secret_score': filtered_secret_preds_disc}
 
     # secret_gen
-    secret_z = torch.randn(input.shape[0], noise_dim).to(input.device)
-    fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], input.shape[0]))).to(input.device)
+    secret_z = torch.randn(audio.shape[0], noise_dim).to(audio.device)
+    fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], audio.shape[0]))).to(audio.device)
     faked_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z, fake_secret_gen)
     fake_secret_preds_gen = models['secret_disc'](faked_mel)
     secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': faked_mel,
@@ -36,9 +36,9 @@ def forward_pass(models, input, secrets):
 
     # secret_disc
     fake_secret_preds_disc = models['secret_disc'](faked_mel.detach().clone())
-    real_secret_preds_disc = models['secret_disc'](input)
+    real_secret_preds_disc = models['secret_disc'](audio)
     fake_secret_disc = Variable(LongTensor(fake_secret_preds_disc.size(0)).fill_(2.0), requires_grad=False).to(
-        input.device)
+        audio.device)
 
     label_preds = models['label_classifier'](faked_mel)
     secret_preds = models['secret_classifier'](faked_mel)
@@ -66,7 +66,7 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
             spectrograms = audio_mel_converter.audio2mel(audio).detach()
             spectrograms, means, stds = preprocess_spectrograms(spectrograms)
             spectrograms = spectrograms.to(device)
-            # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+            spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
 
             filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
                                                                                                         spectrograms,
@@ -114,7 +114,7 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, ga
         spectrograms = audio_mel_converter.audio2mel(input).detach()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
         spectrograms = spectrograms.to(device)
-        # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+        spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
 
         filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
                                                                                                     spectrograms,

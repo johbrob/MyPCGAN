@@ -24,7 +24,7 @@ def generate_samples(data_loader, audio_mel_converter, models, device):
         original_spectrograms = spectrograms.clone()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
         spectrograms = spectrograms.to(device)
-        # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
+        spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
 
         # filter_gen
         filter_z = torch.randn(spectrograms.shape[0], noise_dim).to(device)
@@ -59,6 +59,8 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
         original_spectrograms = spectrograms.clone()
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
         spectrograms = spectrograms.to(device)
+        spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
+        original_spectrograms = original_spectrograms.unsqueeze(dim=1) if original_spectrograms.dim() == 3 else original_spectrograms
         # spectrograms = torch.unsqueeze(spectrograms, 1).to(device)
 
         # filter_gen
