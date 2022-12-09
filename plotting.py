@@ -25,7 +25,7 @@ def comparison_plot_filtergen(file_path, orig_spec, male_spec, female_spec, orig
 
 def comparison_plot_pcgan(original_spectrogram, filtered_spectrogram, male_spectrogram, female_spectrogram,
                           secret, label, pred_secret_male, pred_secret_female, pred_label_male, pred_label_female,
-                          male_distortion, female_distortion, sample_distortion, example_dirs, epoch, id):
+                          male_distortion, female_distortion, sample_distortion, save_dir, epoch, id):
 
     pred_secret_male = 'male' if pred_secret_male else 'female'
     pred_secret_female = 'female' if pred_secret_female else 'male'
@@ -41,7 +41,7 @@ def comparison_plot_pcgan(original_spectrogram, filtered_spectrogram, male_spect
 
     speaker_digit_str = f'speaker_{id.item()}_digit_{label.item()}'
     speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
-    file_path = os.path.join(example_dirs['spec'], speaker_digit_epoch_str)
+    file_path = os.path.join(save_dir, speaker_digit_epoch_str)
     Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     orig_spec_np = torch.squeeze(original_spectrogram).cpu().numpy()

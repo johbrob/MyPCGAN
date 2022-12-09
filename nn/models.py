@@ -42,6 +42,15 @@ def double_conv(channels_in, channels_out, kernel_size):
     )
 
 
+class UnetConfig:
+    def __init__(self, kernel_size=3, embedding_dim=16, noise_dim=10, activation='sigmoid', use_cond=False):
+        self.kernel_size = kernel_size
+        self.embedding_dim = embedding_dim
+        self.noise_dim = noise_dim
+        self.use_cond = use_cond
+        self.activation = activation
+
+
 class UNetFilter(nn.Module):
     def __init__(self, channels_in, channels_out, chs, kernel_size=3, image_width=64, image_height=64,
                  noise_dim=10, activation='sigmoid', n_classes=2, embedding_dim=16, use_cond=True):
