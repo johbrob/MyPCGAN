@@ -58,40 +58,40 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
 
         utils.set_mode(models, utils.Mode.TRAIN)
         step_counter = 0
-        # for i, (audio, secret, label, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
-        #                                                  total=len(train_loader)):
-        #     step_counter += 1
-        #
-        #     label, secret = label.to(device), secret.to(device)
-        #     audio = torch.unsqueeze(audio, 1)
-        #     spectrograms = audio_mel_converter.audio2mel(audio).detach()
-        #     spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-        #     spectrograms = spectrograms.to(device)
-        #     spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
-        #
-        #     filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
-        #                                                                                                 spectrograms,
-        #                                                                                                 secret)
-        #     losses = compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output,
-        #                             secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
-        #     utils.backward(losses)
-        #
-        #     metrics = compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
-        #                               secret_disc_output, losses)
-        #     metrics = compile_metrics(metrics)
-        #     if training_config.do_log:
-        #         log.metrics(metrics, suffix='train', commit=True)
-        #
-        #     if step_counter % training_config.updates_per_evaluation == 0:
-        #         val_metrics = evaluate_on_dataset(test_loader, audio_mel_converter, models, loss_funcs, gamma,
-        #                                           use_entropy_loss,
-        #                                           device)
-        #         if training_config.do_log:
-        #             log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
-        #
-        #     if step_counter % training_config.gradient_accumulation == 0:
-        #         utils.step(optimizers)
-        #         utils.zero_grad(optimizers)
+        for i, (audio, secret, label, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
+                                                         total=len(train_loader)):
+            step_counter += 1
+
+            label, secret = label.to(device), secret.to(device)
+            audio = torch.unsqueeze(audio, 1)
+            spectrograms = audio_mel_converter.audio2mel(audio).detach()
+            spectrograms, means, stds = preprocess_spectrograms(spectrograms)
+            spectrograms = spectrograms.to(device)
+            spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
+
+            filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
+                                                                                                        spectrograms,
+                                                                                                        secret)
+            losses = compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output,
+                                    secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
+            utils.backward(losses)
+
+            metrics = compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
+                                      secret_disc_output, losses)
+            metrics = compile_metrics(metrics)
+            if training_config.do_log:
+                log.metrics(metrics, suffix='train', commit=True)
+
+            if step_counter % training_config.updates_per_evaluation == 0:
+                val_metrics = evaluate_on_dataset(test_loader, audio_mel_converter, models, loss_funcs, gamma,
+                                                  use_entropy_loss,
+                                                  device)
+                if training_config.do_log:
+                    log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
+
+            if step_counter % training_config.gradient_accumulation == 0:
+                utils.step(optimizers)
+                utils.zero_grad(optimizers)
 
         if epoch % training_config.save_interval == 0:
             print("Saving audio and spectrogram samples.")
