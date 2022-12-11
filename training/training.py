@@ -1,7 +1,7 @@
 from metrics_compiling import compute_metrics, compile_metrics, aggregate_metrics
 from loss_compiling import compute_losses
 from training.utils import preprocess_spectrograms
-from training.sampling import save_test_samples
+from training.sampling import save_test_samples, generate_samples
 import numpy as np
 import torch
 import utils
@@ -96,8 +96,19 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
         if epoch % training_config.save_interval == 0:
             print("Saving audio and spectrogram samples.")
             save_test_samples(utils.create_run_subdir(training_config.run_name, 'samples'), test_loader,
-                              audio_mel_converter,
-                              models, loss_funcs, epoch, sample_rate, device)
+                              audio_mel_converter, models, loss_funcs, epoch, sample_rate, device)
+
+
+            # samples = generate_samples(test_loader, audio_mel_converter, models, device)
+            # utils.save_sample(utils.create_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
+            #                   pred_label_female, filtered_audio, audio_male, audio_female, input.squeeze(),
+            #                   sampling_rate)
+            #
+            # comparison_plot_pcgan(original_spectrograms, unnormalized_filtered_mel, unnormalized_fake_mel_male,
+            #                       unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
+            #                       pred_label_male, pred_label_female, male_distortion, female_distortion,
+            #                       sample_distortion,
+            #                       utils.create_subdir(example_dir, 'spectrograms'), epoch, id)
 
         if epoch % training_config.checkpoint_interval == 0:
             utils.save_models_and_optimizers(utils.create_run_subdir(training_config.run_name, 'checkpoints'),

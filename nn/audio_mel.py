@@ -10,10 +10,10 @@ import torch
 
 
 class AudioMelConfig:
-    def __init__(self, n_fft=1024, hop_length=256, win_length=1024, sample_rate=22050, n_mels=80, center=False,
+    def __init__(self, n_fft=1024, hop_length=256, win_length=1024, sample_rate=8000, n_mels=80, center=False,
                  mel_fmin=0.0, mel_fmax=None):
         self.n_fft = n_fft
-        self.sample_rate = sample_rate
+        self.sample_rate = sample_rate          # 22050
         self.hop_length = hop_length
         self.win_length = win_length
         self.n_mels = n_mels
