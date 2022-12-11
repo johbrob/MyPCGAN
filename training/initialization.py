@@ -39,13 +39,19 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
     training_config = experiment_config.training_config
     unet_config = experiment_config.unet_config
 
-    label_classifier = load_modified_ResNet(n_labels).to(device).eval()
-    secret_classifier = load_modified_ResNet(n_genders).to(device).eval()
+    # label_classifier = load_modified_ResNet(n_labels).to(device).eval()
+    # secret_classifier = load_modified_ResNet(n_genders).to(device).eval()
 
     # TODO: Fix loading state dicts
     # tmp_lc = torch.load(local_vars.PWD + 'nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
     #                     map_location=torch.device('cpu'))
-    # label_classifier.load_state_dict(tmp_lc)
+    label_classifier = load_modified_AlexNet(n_labels).to(device)
+    label_classifier.load_state_dict(torch.load('nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
+                                                map_location=torch.device('cpu')))
+
+    secret_classifier = load_modified_AlexNet(n_genders).to(device)
+    secret_classifier.load_state_dict(torch.load('nn/pretrained_weights/best_gender_alexnet_epoch_29.pt',
+                                                 map_location=torch.device('cpu')))
     #
     # secret_classifier.load_state_dict(
     #     torch.load(local_vars.PWD + 'nn/pretrained_weights/best_gender_alexnet_epoch_29.pt'),
