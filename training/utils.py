@@ -1,10 +1,14 @@
 import torch
 
 
-def preprocess_spectrograms(spectrograms):
-    means = torch.mean(spectrograms, dim=(1, 2), keepdim=True)
-    stds = torch.std(spectrograms, dim=(1, 2), keepdim=True)
-    normalized_spectrograms = (spectrograms - means) / (3 * stds + 1e-6)
-    clipped_spectrograms = torch.clamp(normalized_spectrograms, -1, 1)
+def _normalize(spectrogram):
+    mean = torch.mean(spectrogram, dim=(1, 2), keepdim=True)
+    std = torch.std(spectrogram, dim=(1, 2), keepdim=True)
+    return (spectrogram - mean) / (3 * std + 1e-6), mean, std
 
-    return clipped_spectrograms, means, stds
+
+def preprocess_spectrograms(spectrograms):
+    spectrogram, mean, std = _normalize(spectrograms)
+    spectrogram = torch.clamp(spectrogram, -1, 1)
+
+    return spectrogram, mean, std

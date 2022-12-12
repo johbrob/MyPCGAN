@@ -16,8 +16,13 @@ def compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret
     # filter_disc
     filtered_secret_preds_disc = torch.argmax(filter_disc_output['filtered_secret_score'], 1).cpu().numpy()
     filtered_secret_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), filtered_secret_preds_disc))
-    filter_disc_metrics = {'loss': losses['filter_disc']['final'].detach().cpu().numpy(),
-                           'accuracy': filtered_secret_accuracy_disc}
+
+    unfiltered_secret_preds_disc = torch.argmax(filter_disc_output['unfiltered_secret_score'], 1).cpu().numpy()
+    unfiltered_secret_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), unfiltered_secret_preds_disc))
+    filter_disc_metrics = {'filtered_loss': losses['filter_disc']['final'].detach().cpu().numpy(),
+                           'filtered_accuracy': filtered_secret_accuracy_disc,
+                           'unfiltered_loss': losses['filter_disc']['unfiltered_score_loss'].detach().cpu().numpy(),
+                           'unfiltered_accuracy': unfiltered_secret_accuracy_disc}
 
     # secret_disc
     # print(secret_disc_output['fake_secret_score'].shape)

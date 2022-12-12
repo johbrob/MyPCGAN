@@ -14,6 +14,8 @@ from torch import LongTensor
 
 
 def forward_pass(models, audio, secrets):
+    assert audio.dim() == 4
+
     noise_dim = models['filter_gen'].noise_dim
 
     # filter_gen
@@ -24,7 +26,9 @@ def forward_pass(models, audio, secrets):
 
     # filter_disc
     filtered_secret_preds_disc = models['filter_disc'](filtered_mel.detach().clone())
-    filter_disc_output = {'filtered_secret_score': filtered_secret_preds_disc}
+    unfiltered_secret_preds_disc = models['filter_disc'](filtered_mel.detach().clone())
+    filter_disc_output = {'filtered_secret_score': filtered_secret_preds_disc,
+                          'unfiltered_secret_score': unfiltered_secret_preds_disc}
 
     # secret_gen
     secret_z = torch.randn(audio.shape[0], noise_dim).to(audio.device)
@@ -60,19 +64,18 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
         step_counter = 0
         for i, (audio, secret, label, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                          total=len(train_loader)):
+            # audio: (bsz x seq_len), secret: (bsz,), label: (bsz,)
             step_counter += 1
-
             label, secret = label.to(device), secret.to(device)
-            audio = torch.unsqueeze(audio, 1)
-            spectrograms = audio_mel_converter.audio2mel(audio).detach()
-            spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-            spectrograms = spectrograms.to(device)
-            spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
+            spectrogram = audio_mel_converter.audio2mel(audio).detach()  # spectrogram: (bsz, n_mels, frames)
+            spectrogram, means, stds = preprocess_spectrograms(spectrogram)
+            spectrogram = spectrogram.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
 
             filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
-                                                                                                        spectrograms,
+                                                                                                        spectrogram,
                                                                                                         secret)
-            losses = compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output,
+
+            losses = compute_losses(loss_funcs, spectrogram, secret, filter_gen_output, filter_disc_output,
                                     secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
             utils.backward(losses)
 
@@ -98,18 +101,6 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
             save_test_samples(utils.create_run_subdir(training_config.run_name, 'samples'), test_loader,
                               audio_mel_converter, models, loss_funcs, epoch, sample_rate, device)
 
-
-            # samples = generate_samples(test_loader, audio_mel_converter, models, device)
-            # utils.save_sample(utils.create_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
-            #                   pred_label_female, filtered_audio, audio_male, audio_female, input.squeeze(),
-            #                   sampling_rate)
-            #
-            # comparison_plot_pcgan(original_spectrograms, unnormalized_filtered_mel, unnormalized_fake_mel_male,
-            #                       unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
-            #                       pred_label_male, pred_label_female, male_distortion, female_distortion,
-            #                       sample_distortion,
-            #                       utils.create_subdir(example_dir, 'spectrograms'), epoch, id)
-
         if epoch % training_config.checkpoint_interval == 0:
             utils.save_models_and_optimizers(utils.create_run_subdir(training_config.run_name, 'checkpoints'),
                                              epoch, models, optimizers)
@@ -121,12 +112,11 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, ga
     metrics = {}
 
     for i, (input, secret, label, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
+        # audio: (bsz x seq_len), secret: (bsz,), label: (bsz,)
         label, secret = label.to(device), secret.to(device)
-        input = torch.unsqueeze(input, 1)
-        spectrograms = audio_mel_converter.audio2mel(input).detach()
+        spectrograms = audio_mel_converter.audio2mel(input).detach()  # spectrogram: (bsz, n_mels, frames)
         spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-        spectrograms = spectrograms.to(device)
-        spectrograms = spectrograms.unsqueeze(dim=1) if spectrograms.dim() == 3 else spectrograms
+        spectrograms = spectrograms.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
 
         filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
                                                                                                     spectrograms,

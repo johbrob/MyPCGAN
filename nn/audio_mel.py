@@ -83,7 +83,7 @@ class CustomAudio2Mel(nn.Module):
 
     def forward(self, audio):
         p = self._get_pad_length()
-        audio = F.pad(audio, (p, p), "reflect").squeeze(1)
+        audio = F.pad(audio, (p, p), "reflect")         # audio: bsz, seq_len
 
         # bsz x L -> bsz x new_L x frames x 2 where
         # new_L = L/2 + 1
