@@ -13,26 +13,26 @@ from torch.autograd import Variable
 from torch import LongTensor
 
 
-def forward_pass(models, audio, secrets):
-    assert audio.dim() == 4
+def forward_pass(models, spectrogram, secrets):
+    assert spectrogram.dim() == 4
 
     noise_dim = models['filter_gen'].noise_dim
 
     # filter_gen
-    filter_z = torch.randn(audio.shape[0], noise_dim).to(audio.device)
-    filtered_mel = models['filter_gen'](audio, filter_z, secrets.long())
+    filter_z = torch.randn(spectrogram.shape[0], noise_dim).to(spectrogram.device)
+    filtered_mel = models['filter_gen'](spectrogram, filter_z, secrets.long())
     filtered_secret_preds_gen = models['filter_disc'](filtered_mel)
     filter_gen_output = {'filtered_mel': filtered_mel, 'filtered_secret_score': filtered_secret_preds_gen}
 
     # filter_disc
     filtered_secret_preds_disc = models['filter_disc'](filtered_mel.detach().clone())
-    unfiltered_secret_preds_disc = models['filter_disc'](filtered_mel.detach().clone())
+    unfiltered_secret_preds_disc = models['filter_disc'](spectrogram.detach().clone())
     filter_disc_output = {'filtered_secret_score': filtered_secret_preds_disc,
                           'unfiltered_secret_score': unfiltered_secret_preds_disc}
 
     # secret_gen
-    secret_z = torch.randn(audio.shape[0], noise_dim).to(audio.device)
-    fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], audio.shape[0]))).to(audio.device)
+    secret_z = torch.randn(spectrogram.shape[0], noise_dim).to(spectrogram.device)
+    fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], spectrogram.shape[0]))).to(spectrogram.device)
     faked_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z, fake_secret_gen)
     fake_secret_preds_gen = models['secret_disc'](faked_mel)
     secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': faked_mel,
@@ -40,9 +40,9 @@ def forward_pass(models, audio, secrets):
 
     # secret_disc
     fake_secret_preds_disc = models['secret_disc'](faked_mel.detach().clone())
-    real_secret_preds_disc = models['secret_disc'](audio)
+    real_secret_preds_disc = models['secret_disc'](spectrogram)
     fake_secret_disc = Variable(LongTensor(fake_secret_preds_disc.size(0)).fill_(2.0), requires_grad=False).to(
-        audio.device)
+        spectrogram.device)
 
     label_preds = models['label_classifier'](faked_mel)
     secret_preds = models['secret_classifier'](faked_mel)
