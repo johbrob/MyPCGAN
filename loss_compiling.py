@@ -38,7 +38,8 @@ def _compute_secret_gen_loss(loss_func, spectrograms, secret_gen_output, gamma):
     adversary_loss = loss_func['adversarial'](secret_gen_output['fake_secret_score'], secret_gen_output['fake_secret'])
     final_loss = adversary_loss + gamma * torch.pow(torch.relu(distortion_loss - 1e-3), 2)
 
-    return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss}
+    return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss,
+            'alt_distortion': distortion_loss, 'alt_adversarial': adversary_loss, 'alt_final': final_loss}
 
 
 def _compute_filter_disc_loss(loss_func, secret, filter_disc_output):

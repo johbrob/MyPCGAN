@@ -1,4 +1,3 @@
-import utils
 from dataset_creation import create_audio_dataset
 from torch.utils.data import Dataset
 import pandas as pd
@@ -6,7 +5,13 @@ import numpy as np
 import local_vars
 import librosa
 import torch
+import enum
 import os
+
+
+class Gender(enum.Enum):
+    MALE = 1,
+    FEMALE = 2
 
 
 def load_wav_to_torch(path, sampling_rate):
@@ -17,7 +22,7 @@ def load_wav_to_torch(path, sampling_rate):
 
 class AudioDataset(Dataset):
 
-    def __init__(self, annotations, sampling_rate, segment_length):
+    def __init__(self, annotations, sampling_rate, segment_length, ):
         self.sampling_rate = sampling_rate
         self.segment_length = segment_length
 

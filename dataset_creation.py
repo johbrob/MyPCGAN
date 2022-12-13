@@ -1,3 +1,4 @@
+import pandas
 import torch.nn.functional as F
 import local_vars
 # import scipy as scipy
@@ -88,6 +89,8 @@ def create_audio_dataset(data_path, sampling_rate, segment_length, save_path, te
 
     train_annotations.to_csv(save_path + 'train_annotations.csv')
     test_annotations.to_csv(save_path + 'test_annotations.csv')
+
+    pd.DataFrame([[1, 0]], columns=['male', 'female']).to_csv(save_path + 'gender_encoding.csv')
 
 if __name__ == '__main__':
     sampling_rate = 8000

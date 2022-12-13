@@ -33,19 +33,25 @@ def forward_pass(models, spectrogram, secrets):
     # secret_gen
     secret_z = torch.randn(spectrogram.shape[0], noise_dim).to(spectrogram.device)
     fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], spectrogram.shape[0]))).to(spectrogram.device)
-    faked_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z, fake_secret_gen)
-    fake_secret_preds_gen = models['secret_disc'](faked_mel)
-    secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': faked_mel,
+    fake_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z, fake_secret_gen)
+    fake_secret_preds_gen = models['secret_disc'](fake_mel)
+    secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
                          'fake_secret_score': fake_secret_preds_gen}
 
+    generate_both_genders = True
+    if generate_both_genders:
+        alt_fake_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z, 1-fake_secret_gen)
+        alt_fake_secret_preds_gen = models['secret_disc'](alt_fake_mel)
+        secret_gen_output.update({'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen})
+
     # secret_disc
-    fake_secret_preds_disc = models['secret_disc'](faked_mel.detach().clone())
+    fake_secret_preds_disc = models['secret_disc'](fake_mel.detach().clone())
     real_secret_preds_disc = models['secret_disc'](spectrogram)
     fake_secret_disc = Variable(LongTensor(fake_secret_preds_disc.size(0)).fill_(2.0), requires_grad=False).to(
         spectrogram.device)
 
-    label_preds = models['label_classifier'](faked_mel)
-    secret_preds = models['secret_classifier'](faked_mel)
+    label_preds = models['label_classifier'](fake_mel)
+    secret_preds = models['secret_classifier'](fake_mel)
     secret_disc_output = {'fake_secret_score': fake_secret_preds_disc, 'real_secret_score': real_secret_preds_disc,
                           'label_score': label_preds, 'secret_score': secret_preds, 'fake_secret': fake_secret_disc}
 
@@ -79,8 +85,8 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
                                     secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
             utils.backward(losses)
 
-            metrics = compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
-                                      secret_disc_output, losses)
+            metrics = compute_metrics(spectrogram, secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
+                                      secret_disc_output, losses, loss_funcs)
             metrics = compile_metrics(metrics)
             if training_config.do_log:
                 log.metrics(metrics, suffix='train', commit=True)
@@ -125,8 +131,8 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, ga
                                 secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
         utils.backward(losses)
 
-        batch_metrics = compute_metrics(secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
-                                        secret_disc_output, losses)
+        batch_metrics = compute_metrics(spectrograms, secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
+                                        secret_disc_output, losses, loss_funcs)
         batch_metrics = compile_metrics(batch_metrics)
         metrics = aggregate_metrics(batch_metrics, metrics)
 
