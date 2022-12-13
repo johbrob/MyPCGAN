@@ -10,21 +10,21 @@ def _compute_filter_gen_metrics(losses):
 
 
 def _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels):
-    # TODO: Need to fix this!!!
-    all_fake_mel = torch.cat((secret_gen_output['faked_mel'], secret_gen_output['alt_faked_mel']), dim=1)
-    male_mels = torch.index_select(all_fake_mel, 1, secret_gen_output['fake_secret'])
-    female_mels = torch.index_select(all_fake_mel, 1, 1 - secret_gen_output['fake_secret'])
+    # fake_mel/alt_fake_mel: (bsz, 1, n_mels, frames))
+    all_fake_mel = torch.stack((secret_gen_output['faked_mel'], secret_gen_output['alt_faked_mel']), dim=1)
+    male_mels = torch.stack([fake_mel[1-fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
+    female_mels = torch.stack([fake_mel[fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
 
-    all_fake_scores = torch.cat((secret_gen_output['fake_secret_score'], secret_gen_output['alt_fake_secret_score']), dim=1)
-    male_scores = torch.index_select(all_fake_scores, 1, secret_gen_output['fake_secret'].type(torch.int))
-    female_scores = torch.index_select(all_fake_scores, 1, 1 - secret_gen_output['fake_secret'].type(torch.int))
+    all_fake_scores = torch.stack((secret_gen_output['fake_secret_score'], secret_gen_output['alt_fake_secret_score']), dim=1)
+    male_scores = torch.stack([fake_scores[1-fake_secret] for fake_scores, fake_secret in zip(all_fake_scores, secret_gen_output['fake_secret'])])
+    female_scores = torch.stack([fake_scores[fake_secret] for fake_scores, fake_secret in zip(all_fake_scores, secret_gen_output['fake_secret'])])
 
     male_female_diff = loss_funcs['distortion'](male_mels, female_mels)
     male_distortion = loss_funcs['distortion'](male_mels, mels)
     female_distortion = loss_funcs['distortion'](female_mels, mels)
     male_adversarial = loss_funcs['adversarial'](male_scores, secret_gen_output['fake_secret'])
     female_adversarial = loss_funcs['adversarial'](female_scores, secret_gen_output['fake_secret'])
-   
+
     return {'distortion_loss': losses['secret_gen']['distortion'].detach().cpu().numpy(),
             'adversarial_loss': losses['secret_gen']['adversarial'].detach().cpu().numpy(),
             'combined_loss': losses['secret_gen']['final'].detach().cpu().numpy(),
