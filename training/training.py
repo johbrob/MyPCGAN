@@ -13,50 +13,89 @@ from torch.autograd import Variable
 from torch import LongTensor
 
 
-def forward_pass(models, mels, secrets):
-    assert mels.dim() == 4
+def filter_gen_forward_pass(filter_gen, filter_disc,mels, secrets):
+    filter_z = torch.randn(mels.shape[0], filter_gen.noise_dim).to(mels.device)
+    filtered_mels = filter_gen(mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
+    filtered_secret_preds_gen = filter_disc(filtered_mels)  # (bsz, n_secret)
+    return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen}
 
-    # filter_gen
-    models['filter_disc'].eval()
-    filter_z = torch.randn(mels.shape[0], models['filter_gen'].noise_dim).to(mels.device)
-    filtered_mel = models['filter_gen'](mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
-    filtered_secret_preds_gen = models['filter_disc'](filtered_mel)  # (bsz, n_secret)
-    filter_gen_output = {'filtered_mel': filtered_mel, 'filtered_secret_score': filtered_secret_preds_gen}
-    models['filter_disc'].train()
-    # filter_disc
-    filtered_secret_preds_disc = models['filter_disc'](filtered_mel.detach())  # (bsz, n_secret)
-    unfiltered_secret_preds_disc = models['filter_disc'](mels.detach())  # (bsz, n_secret)
-    filter_disc_output = {'filtered_secret_score': filtered_secret_preds_disc,
-                          'unfiltered_secret_score': unfiltered_secret_preds_disc}
 
-    # secret_gen
-    secret_z = torch.randn(mels.shape[0], models['filter_gen'].noise_dim).to(mels.device)
+def secret_gen_forward_pass(secret_gen, secret_disc, mels, filtered_mel):
+    secret_z = torch.randn(mels.shape[0], secret_gen.noise_dim).to(mels.device)
     fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], mels.shape[0]))).to(mels.device)  # (bsz,)
-    fake_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z,
-                                    fake_secret_gen)  # (bsz, 1, n_mels, frames)
-    fake_secret_preds_gen = models['secret_disc'](fake_mel)  # (bsz, n_secrets + 1)
+    fake_mel = secret_gen(filtered_mel.detach().clone(), secret_z,
+                     fake_secret_gen)  # (bsz, 1, n_mels, frames)
+    fake_secret_preds_gen = secret_disc(fake_mel)  # (bsz, n_secrets + 1)
     secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
                          'fake_secret_score': fake_secret_preds_gen}
 
     generate_both_genders = True
     if generate_both_genders:
-        alt_fake_mel = models['secret_gen'](filtered_mel.detach().clone(), secret_z,
-                                            1 - fake_secret_gen)  # (bsz, 1, n_mels, frames)
-        alt_fake_secret_preds_gen = models['secret_disc'](alt_fake_mel)  # (bsz, n_secrets + 1)
+        alt_fake_mel = secret_gen(filtered_mel.detach().clone(), secret_z,
+                             1 - fake_secret_gen)  # (bsz, 1, n_mels, frames)
+        alt_fake_secret_preds_gen = secret_disc(alt_fake_mel)  # (bsz, n_secrets + 1)
         secret_gen_output.update({'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen})
 
-    # secret_disc
-    fake_secret_preds_disc = models['secret_disc'](fake_mel.detach().clone())  # (bsz, n_secrets + 1)
-    real_secret_preds_disc = models['secret_disc'](mels)  # (bsz, n_secrets + 1)
+    return secret_gen_output
+
+
+def filter_disc_forward_pass(filter_disc, mels, filtered_mels):
+    filtered_secret_preds_disc = filter_disc(filtered_mels.detach())  # (bsz, n_secret)
+    unfiltered_secret_preds_disc = filter_disc(mels.detach())  # (bsz, n_secret)
+    return {'filtered_secret_score': filtered_secret_preds_disc,
+            'unfiltered_secret_score': unfiltered_secret_preds_disc}
+
+
+def secret_disc_forward_pass(secret_disc, mels, fake_mel):
+    fake_secret_preds_disc = secret_disc(fake_mel.detach().clone())  # (bsz, n_secrets + 1)
+    real_secret_preds_disc = secret_disc(mels)  # (bsz, n_secrets + 1)
     fake_secret_disc = Variable(LongTensor(fake_secret_preds_disc.size(0)).fill_(2.0), requires_grad=False).to(
         mels.device)
+    return {'fake_secret_score': fake_secret_preds_disc, 'real_secret_score': real_secret_preds_disc,
+            'fake_secret': fake_secret_disc}
 
-    label_preds = models['label_classifier'](fake_mel)
-    secret_preds = models['secret_classifier'](fake_mel)
-    secret_disc_output = {'fake_secret_score': fake_secret_preds_disc, 'real_secret_score': real_secret_preds_disc,
-                          'label_score': label_preds, 'secret_score': secret_preds, 'fake_secret': fake_secret_disc}
 
-    return filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output
+def forward_pass(models, optimizers, mels, secrets, loss_funcs, gamma, entropy_loss):
+    assert mels.dim() == 4
+
+    # filter_gen
+    from loss_compiling import _compute_filter_gen_loss, _compute_secret_gen_loss, _compute_filter_disc_loss, \
+        _compute_secret_disc_loss
+    optimizers['filter_gen'].zero_grad()
+    filter_gen_output = filter_gen_forward_pass(models['filter_gen'], models['filter_disc'], mels, secrets)
+    filter_gen_loss = _compute_filter_gen_loss(loss_funcs, mels, secrets, filter_gen_output, gamma, entropy_loss)
+    filter_gen_loss['final'].backward()
+    optimizers['filter_gen'].step()
+
+    # secret_gen
+    optimizers['secret_gen'].zero_grad()
+    secret_gen_output = secret_gen_forward_pass(models['secret_gen'], models['secret_disc'], mels, filter_gen_output['filtered_mel'])
+    secret_gen_loss = _compute_secret_gen_loss(loss_funcs, mels, secret_gen_output, gamma)
+    secret_gen_loss['final'].backward()
+    optimizers['secret_gen'].step()
+
+    # filter_disc
+    optimizers['filter_disc'].zero_grad()
+    filter_disc_output = filter_disc_forward_pass(models['filter_disc'], mels, filter_gen_output['filtered_mel'])
+    filter_disc_loss = _compute_filter_disc_loss(loss_funcs, secrets, filter_disc_output)
+    filter_disc_loss['final'].backward()
+    optimizers['filter_disc'].step()
+
+    # secret_disc
+    optimizers['secret_disc'].zero_grad()
+    secret_disc_output = secret_disc_forward_pass(models['secret_disc'], mels, secret_gen_output['faked_mel'])
+    secret_disc_loss = _compute_secret_disc_loss(loss_funcs, secrets, secret_disc_output)
+    secret_disc_loss['final'].backward()
+    optimizers['secret_disc'].step()
+
+    label_preds = models['label_classifier'](secret_gen_output['faked_mel'])
+    secret_preds = models['secret_classifier'](secret_gen_output['faked_mel'])
+    secret_disc_output.update({'label_score': label_preds, 'secret_score': secret_preds})
+
+    losses = {'filter_gen': filter_gen_loss, 'filter_disc': filter_disc_loss, 'secret_gen': secret_gen_loss,
+              'secret_disc': secret_disc_loss}
+
+    return filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output, losses
 
 
 def training_loop(train_loader, test_loader, training_config, models, optimizers, audio_mel_converter, loss_funcs,
@@ -78,16 +117,14 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
             mels, means, stds = preprocess_spectrograms(mels)
             mels = mels.unsqueeze(dim=1).to(device)  # mels: (bsz, 1, n_mels, frames)
 
-            filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
-                                                                                                        mels,
-                                                                                                        secrets)
+            filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output, \
+                losses = forward_pass(models, optimizers, mels, secrets, loss_funcs, gamma, use_entropy_loss)
 
-            losses = compute_losses(loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
-                                    secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
-            utils.has_gradients(models['filter_gen'], 'filter_gen')
-            utils.backward(losses)
-            utils.has_gradients(models['filter_gen'], 'filter_gen')
-
+            # losses = compute_losses(loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
+            #                         secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
+            # utils.has_gradients(models['filter_gen'], 'filter_gen')
+            # utils.backward(losses)
+            # utils.has_gradients(models['filter_gen'], 'filter_gen')
 
             metrics = compute_metrics(mels, secrets, labels, filter_gen_output, filter_disc_output, secret_gen_output,
                                       secret_disc_output, losses, loss_funcs)
@@ -102,9 +139,9 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
                 if training_config.do_log:
                     log.metrics(val_metrics, suffix='val', aggregation=np.mean, commit=True)
 
-            if step_counter % training_config.gradient_accumulation == 0:
-                utils.step(optimizers)
-                utils.zero_grad(optimizers)
+            # if step_counter % training_config.gradient_accumulation == 0:
+            #     utils.step(optimizers)
+            #     utils.zero_grad(optimizers)
 
         if epoch % training_config.save_interval == 0:
             print("Saving data and mels samples.")
@@ -121,21 +158,47 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, ga
 
     metrics = {}
 
-    for i, (input, secret, label, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
-        # audio: (bsz x seq_len), secret: (bsz,), label: (bsz,)
-        label, secret = label.to(device), secret.to(device)
-        spectrograms = audio_mel_converter.audio2mel(input).detach()  # spectrogram: (bsz, n_mels, frames)
-        spectrograms, means, stds = preprocess_spectrograms(spectrograms)
-        spectrograms = spectrograms.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
+    for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
+        # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
+        labels, secrets = labels.to(device), secrets.to(device)
+        mels = audio_mel_converter.audio2mel(data).detach()  # spectrogram: (bsz, n_mels, frames)
+        mels, means, stds = preprocess_spectrograms(mels)
+        mels = mels.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
 
-        filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
-                                                                                                    spectrograms,
-                                                                                                    secret)
-        losses = compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output,
-                                secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
-        utils.backward(losses)
+        # filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
+        #                                                                                             mels,
+        #                                                                                             secrets)
+        # losses = compute_losses(loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
+        #                         secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
+        # utils.backward(losses)
 
-        batch_metrics = compute_metrics(spectrograms, secret, label, filter_gen_output, filter_disc_output,
+        # filter_gen
+        from loss_compiling import _compute_filter_gen_loss, _compute_secret_gen_loss, _compute_filter_disc_loss, \
+            _compute_secret_disc_loss
+        filter_gen_output = filter_gen_forward_pass(models['filter_gen'], models['filter_disc'], mels, secrets)
+        filter_gen_loss = _compute_filter_gen_loss(loss_funcs, mels, secrets, filter_gen_output, gamma, use_entropy_loss)
+
+        # secret_gen
+        secret_gen_output = secret_gen_forward_pass(models['secret_gen'], models['secret_disc'], mels,
+                                                    filter_gen_output['filtered_mel'])
+        secret_gen_loss = _compute_secret_gen_loss(loss_funcs, mels, secret_gen_output, gamma)
+
+        # filter_disc
+        filter_disc_output = filter_disc_forward_pass(models['filter_disc'], mels, filter_gen_output['filtered_mel'])
+        filter_disc_loss = _compute_filter_disc_loss(loss_funcs, secrets, filter_disc_output)
+
+        # secret_disc
+        secret_disc_output = secret_disc_forward_pass(models['secret_disc'], mels, secret_gen_output['faked_mel'])
+        secret_disc_loss = _compute_secret_disc_loss(loss_funcs, secrets, secret_disc_output)
+
+        label_preds = models['label_classifier'](secret_gen_output['faked_mel'])
+        secret_preds = models['secret_classifier'](secret_gen_output['faked_mel'])
+        secret_disc_output.update({'label_score': label_preds, 'secret_score': secret_preds})
+
+        losses = {'filter_gen': filter_gen_loss, 'filter_disc': filter_disc_loss, 'secret_gen': secret_gen_loss,
+                  'secret_disc': secret_disc_loss}
+
+        batch_metrics = compute_metrics(mels, secrets, labels, filter_gen_output, filter_disc_output,
                                         secret_gen_output,
                                         secret_disc_output, losses, loss_funcs)
         batch_metrics = compile_metrics(batch_metrics)

@@ -44,8 +44,8 @@ def _compute_secret_gen_loss(loss_func, spectrograms, secret_gen_output, gamma):
 
 def _compute_filter_disc_loss(loss_func, secret, filter_disc_output):
     return {'final': loss_func['adversarial'](filter_disc_output['filtered_secret_score'], secret.long()),
-            'unfiltered_score_loss': loss_func['adversarial'](filter_disc_output['unfiltered_secret_score'].detach(), secret.long())}
-
+            'unfiltered_score_loss': loss_func['adversarial'](filter_disc_output['unfiltered_secret_score'].detach(),
+                                                              secret.long())}
 
 
 def _compute_secret_disc_loss(loss_func, secret, secret_disc_output):

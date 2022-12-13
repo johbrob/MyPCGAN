@@ -78,7 +78,7 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
 
     optimizers = {
         'filter_gen': torch.optim.Adam(filter_gen.parameters(), training_config.lr['filter_gen'], betas=(0.5, 0.9)),
-        'filter_disc': torch.optim.Adam(filter_disc.parameters(), training_config.lr['filter_gen'], betas=(0.5, 0.9)),
+        'filter_disc': torch.optim.Adam(filter_disc.parameters(), training_config.lr['filter_disc'], betas=(0.5, 0.9)),
         'secret_gen': torch.optim.Adam(secret_gen.parameters(), training_config.lr['secret_gen'], betas=(0.5, 0.9)),
         'secret_disc': torch.optim.Adam(secret_disc.parameters(), training_config.lr['secret_disc'], betas=(0.5, 0.9))
     }
@@ -92,9 +92,9 @@ def init_training(dataset_name, experiment_settings, device):
 
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
     test_female_speakar_ratio = sum(1 - test_data.gender_idx) / len(test_data.gender_idx)
-    print(f'Training set contains {train_data.n_speakers} speakers with {train_female_speakar_ratio}% female speakers.'
+    print(f'Training set contains {train_data.n_speakers} speakers with {int(100*train_female_speakar_ratio)}% female speakers.'
           f' Total size is {len(train_data.gender_idx)}')
-    print(f'Test set contains {test_data.n_speakers} speakers with {test_female_speakar_ratio}% female speakers.'
+    print(f'Test set contains {test_data.n_speakers} speakers with {int(100*test_female_speakar_ratio)}% female speakers.'
           f' Total size is {len(test_data.gender_idx)}')
 
     train_loader = DataLoader(train_data, training_config.train_batch_size,

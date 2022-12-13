@@ -30,7 +30,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'dataset': 'audiomnist', 'settings': 'debug', 'gpu': 0}
+    args = {'dataset': 'audiomnist', 'settings': 'github_lower_lr', 'gpu': 0}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpu'] == 'no':
