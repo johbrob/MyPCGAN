@@ -47,6 +47,7 @@ def _compute_filter_disc_loss(loss_func, secret, filter_disc_output):
             'unfiltered_score_loss': loss_func['adversarial'](filter_disc_output['unfiltered_secret_score'].detach(), secret.long())}
 
 
+
 def _compute_secret_disc_loss(loss_func, secret, secret_disc_output):
     real_loss = loss_func['adversarial_rf'](secret_disc_output['real_secret_score'],
                                             secret.long().to(secret_disc_output['fake_secret_score'].device)).to(

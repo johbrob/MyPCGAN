@@ -89,6 +89,14 @@ def init_training(dataset_name, experiment_settings, device):
     training_config, audio_mel_config, unet_config, loss_config = experiment_settings.get_configs()
 
     train_data, test_data = AudioDataset.load()
+
+    train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
+    test_female_speakar_ratio = sum(1 - test_data.gender_idx) / len(test_data.gender_idx)
+    print(f'Training set contains {train_data.n_speakers} speakers with {train_female_speakar_ratio}% female speakers.'
+          f' Total size is {len(train_data.gender_idx)}')
+    print(f'Test set contains {test_data.n_speakers} speakers with {test_female_speakar_ratio}% female speakers.'
+          f' Total size is {len(test_data.gender_idx)}')
+
     train_loader = DataLoader(train_data, training_config.train_batch_size,
                               num_workers=training_config.train_num_workers, shuffle=True)
     test_loader = DataLoader(test_data, training_config.test_batch_size,

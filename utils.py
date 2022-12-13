@@ -119,8 +119,21 @@ def nestedConfigs2dict(nested_config):
     return {k: v for attr in nested_config.__dict__.values() for k, v in vars(attr).items()}
 
 
+def has_gradients(model, model_name):
+    grads_are_zero = True
+    max_abs_grad = 0
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grads_are_zero = False
+            max_abs_grad = max(max_abs_grad, param.abs().max())
+
+    if grads_are_zero:
+        print(f'{model_name} has no gradients')
+    else:
+        print(f'{model_name} has gradients and largest is {max_abs_grad}')
+
+
 if __name__ == '__main__':
     import configs
-
     c = configs.get_experiment_config_debug()
     print(nestedConfigs2dict(c))

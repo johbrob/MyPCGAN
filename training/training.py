@@ -17,14 +17,15 @@ def forward_pass(models, mels, secrets):
     assert mels.dim() == 4
 
     # filter_gen
+    models['filter_disc'].eval()
     filter_z = torch.randn(mels.shape[0], models['filter_gen'].noise_dim).to(mels.device)
     filtered_mel = models['filter_gen'](mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
     filtered_secret_preds_gen = models['filter_disc'](filtered_mel)  # (bsz, n_secret)
     filter_gen_output = {'filtered_mel': filtered_mel, 'filtered_secret_score': filtered_secret_preds_gen}
-
+    models['filter_disc'].train()
     # filter_disc
-    filtered_secret_preds_disc = models['filter_disc'](filtered_mel.detach().clone())  # (bsz, n_secret)
-    unfiltered_secret_preds_disc = models['filter_disc'](mels.detach().clone())  # (bsz, n_secret)
+    filtered_secret_preds_disc = models['filter_disc'](filtered_mel.detach())  # (bsz, n_secret)
+    unfiltered_secret_preds_disc = models['filter_disc'](mels.detach())  # (bsz, n_secret)
     filter_disc_output = {'filtered_secret_score': filtered_secret_preds_disc,
                           'unfiltered_secret_score': unfiltered_secret_preds_disc}
 
@@ -83,7 +84,10 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
 
             losses = compute_losses(loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
                                     secret_gen_output, secret_disc_output, gamma, use_entropy_loss)
+            utils.has_gradients(models['filter_gen'], 'filter_gen')
             utils.backward(losses)
+            utils.has_gradients(models['filter_gen'], 'filter_gen')
+
 
             metrics = compute_metrics(mels, secrets, labels, filter_gen_output, filter_disc_output, secret_gen_output,
                                       secret_disc_output, losses, loss_funcs)

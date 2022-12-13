@@ -22,7 +22,7 @@ def load_wav_to_torch(path, sampling_rate):
 
 class AudioDataset(Dataset):
 
-    def __init__(self, annotations, sampling_rate, segment_length, ):
+    def __init__(self, annotations, sampling_rate, segment_length):
         self.sampling_rate = sampling_rate
         self.segment_length = segment_length
 
@@ -49,7 +49,7 @@ class AudioDataset(Dataset):
         return len(self.audio_files)
 
     @staticmethod
-    def load(sampling_rate=8000, segment_length=8192):
+    def load(sampling_rate=8000, segment_length=8192, even_gender=True):
         if not os.path.exists(local_vars.PREPROCESSED_AUDIO_MNIST_PATH):
             print('No preprocessed data found...')
             if os.path.exists(local_vars.AUDIO_MNIST_PATH):
@@ -57,14 +57,16 @@ class AudioDataset(Dataset):
                 create_audio_dataset(local_vars.AUDIO_MNIST_PATH,
                                      sampling_rate, segment_length,
                                      local_vars.PREPROCESSED_AUDIO_MNIST_PATH,
-                                     0.10)
+                                     0.20,
+                                     even_gender)
             else:
                 print('No raw dataset found...Make sure dataset is available')
 
-        train_annotations = pd.read_csv(local_vars.PREPROCESSED_AUDIO_MNIST_PATH + 'train_annotations.csv')
+        prefix = 'even_' if even_gender else ''
+        train_annotations = pd.read_csv(local_vars.PREPROCESSED_AUDIO_MNIST_PATH + prefix + 'train_annotations.csv')
         trainData = AudioDataset(train_annotations, sampling_rate, segment_length)
 
-        test_annotations = pd.read_csv(local_vars.PREPROCESSED_AUDIO_MNIST_PATH + 'test_annotations.csv')
+        test_annotations = pd.read_csv(local_vars.PREPROCESSED_AUDIO_MNIST_PATH + prefix + 'test_annotations.csv')
         testData = AudioDataset(test_annotations, sampling_rate, segment_length)
 
         return trainData, testData
