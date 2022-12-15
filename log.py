@@ -14,17 +14,16 @@ def init(config_data, project='MyPCGAN', entity='johbrob', run_name='tmp-{}', di
     wandb.init(name=run_name, config=config_data, project=project, entity=entity, mode=mode)
 
 
-def data(data):
-    pass
+def _log_values(data, step, commit=True):
+    wandb.log(data, step=step, commit=commit)
 
 
-def _log_values(data, commit=True):
-    wandb.log(data, commit=commit)
-
-
-def metrics(data, prefix=None, suffix=None, aggregation=np.mean, selectedKeys=None, commit=False):
+def metrics(data, step, prefix=None, suffix=None, aggregation=np.mean, selectedKeys=None, commit=False):
     prefix = prefix + '-' if prefix else ''
     suffix = '-' + suffix if suffix else ''
 
     targetKeys = selectedKeys if selectedKeys is not None else data.keys()
-    _log_values({"{}{}{}".format(prefix, k, suffix): aggregation(data[k]) for k in targetKeys}, commit=commit)
+    data = {"{}{}{}".format(prefix, k, suffix): aggregation(data[k]) for k in targetKeys}
+    # data['Epoch'] = epoch
+    # data['Step'] = step
+    _log_values(data, step, commit=commit)

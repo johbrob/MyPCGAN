@@ -43,7 +43,7 @@ def double_conv(channels_in, channels_out, kernel_size):
 
 
 class UnetConfig:
-    def __init__(self, kernel_size=3, embedding_dim=16, noise_dim=10, activation='sigmoid', use_cond=False):
+    def __init__(self, kernel_size=3, embedding_dim=16, noise_dim=10, activation='sigmoid', use_cond=True):
         self.kernel_size = kernel_size
         self.embedding_dim = embedding_dim
         self.noise_dim = noise_dim

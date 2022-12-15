@@ -33,8 +33,14 @@ def create_github_default_config():
                             loss_compute_config=LossConfig())
 
 
+# def create_github_lower_lr_config():
+#     # Missing settings: D_real_loss_weight, utility_loss, filter_receptive_field == kernel_size?
+#     return ExperimentConfig(training_config=TrainingConfig(lr=lr, run_name='github_lower_lr', epochs=50),
+#                             audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(),
+#                             loss_compute_config=LossConfig())
+
 def create_github_lower_lr_config():
     # Missing settings: D_real_loss_weight, utility_loss, filter_receptive_field == kernel_size?
-    return ExperimentConfig(training_config=TrainingConfig(lr=lr, run_name='github_lower_lr', epochs=10),
+    return ExperimentConfig(training_config=TrainingConfig(lr=lr, run_name='github_lower_lr', epochs=50),
                             audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(),
-                            loss_compute_config=LossConfig())
+                            loss_compute_config=LossConfig(gamma=100, epsilon=1e-3))

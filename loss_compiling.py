@@ -2,8 +2,9 @@ import torch
 
 
 class LossConfig:
-    def __init__(self, gamma=100, use_entropy_loss=False):
+    def __init__(self, gamma=100, epsilon=1e-3, use_entropy_loss=False):
         self.gamma = gamma
+        self.epsilon = epsilon
         self.use_entropy_loss = use_entropy_loss
 
 
@@ -17,26 +18,26 @@ class HLoss(torch.nn.Module):
         return b
 
 
-def _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output, gamma, entropy_loss):
+def _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output, loss_config):
     ones = torch.ones(secret.shape, requires_grad=True, dtype=torch.float32).to(spectrograms.device)
     target = ones - secret.float()
     target = target.view(target.size(0))
     distortion_loss = loss_funcs['distortion'](filter_gen_output['filtered_mel'], spectrograms)
 
-    if entropy_loss or True:
+    if loss_config.use_entropy_loss or True:
         adversary_loss = loss_funcs['entropy'](filter_gen_output['filtered_secret_score'])
     else:
         adversary_loss = loss_funcs['adversarial'](filter_gen_output['filtered_secret_score'], target.long())
 
-    final_loss = adversary_loss + gamma * torch.pow(torch.relu(distortion_loss - 1e-3), 2)
+    final_loss = adversary_loss + loss_config.gamma * torch.pow(torch.relu(distortion_loss - loss_config.epsilon), 2)
 
     return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss}
 
 
-def _compute_secret_gen_loss(loss_func, spectrograms, secret_gen_output, gamma):
+def _compute_secret_gen_loss(loss_func, spectrograms, secret_gen_output, loss_config):
     distortion_loss = loss_func['distortion'](secret_gen_output['faked_mel'], spectrograms)
     adversary_loss = loss_func['adversarial'](secret_gen_output['fake_secret_score'], secret_gen_output['fake_secret'])
-    final_loss = adversary_loss + gamma * torch.pow(torch.relu(distortion_loss - 1e-3), 2)
+    final_loss = adversary_loss + loss_config.gamma * torch.pow(torch.relu(distortion_loss - loss_config.epsilon), 2)
 
     return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss,
             'alt_distortion': distortion_loss, 'alt_adversarial': adversary_loss, 'alt_final': final_loss}
@@ -60,11 +61,10 @@ def _compute_secret_disc_loss(loss_func, secret, secret_disc_output):
 
 
 def compute_losses(loss_funcs, spectrograms, secret, filter_gen_output, filter_disc_output, secret_gen_output,
-                   secret_disc_output, gamma, filter_gen_entropy_loss):
+                   secret_disc_output, loss_config):
     losses = {}
-    losses['filter_gen'] = _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output, gamma,
-                                                    filter_gen_entropy_loss)
-    losses['secret_gen'] = _compute_secret_gen_loss(loss_funcs, spectrograms, secret_gen_output, gamma)
+    losses['filter_gen'] = _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output, loss_config)
+    losses['secret_gen'] = _compute_secret_gen_loss(loss_funcs, spectrograms, secret_gen_output, loss_config)
     losses['filter_disc'] = _compute_filter_disc_loss(loss_funcs, secret, filter_disc_output)
     losses['secret_disc'] = _compute_secret_disc_loss(loss_funcs, secret, secret_disc_output)
 

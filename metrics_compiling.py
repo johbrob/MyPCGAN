@@ -12,12 +12,17 @@ def _compute_filter_gen_metrics(losses):
 def _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels):
     # fake_mel/alt_fake_mel: (bsz, 1, n_mels, frames))
     all_fake_mel = torch.stack((secret_gen_output['faked_mel'], secret_gen_output['alt_faked_mel']), dim=1)
-    male_mels = torch.stack([fake_mel[1-fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
-    female_mels = torch.stack([fake_mel[fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
+    male_mels = torch.stack(
+        [fake_mel[1 - fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
+    female_mels = torch.stack(
+        [fake_mel[fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
 
-    all_fake_scores = torch.stack((secret_gen_output['fake_secret_score'], secret_gen_output['alt_fake_secret_score']), dim=1)
-    male_scores = torch.stack([fake_scores[1-fake_secret] for fake_scores, fake_secret in zip(all_fake_scores, secret_gen_output['fake_secret'])])
-    female_scores = torch.stack([fake_scores[fake_secret] for fake_scores, fake_secret in zip(all_fake_scores, secret_gen_output['fake_secret'])])
+    all_fake_scores = torch.stack((secret_gen_output['fake_secret_score'], secret_gen_output['alt_fake_secret_score']),
+                                  dim=1)
+    male_scores = torch.stack([fake_scores[1 - fake_secret] for fake_scores, fake_secret in
+                               zip(all_fake_scores, secret_gen_output['fake_secret'])])
+    female_scores = torch.stack([fake_scores[fake_secret] for fake_scores, fake_secret in
+                                 zip(all_fake_scores, secret_gen_output['fake_secret'])])
 
     male_female_diff = loss_funcs['distortion'](male_mels, female_mels)
     male_distortion = loss_funcs['distortion'](male_mels, mels)
@@ -93,8 +98,9 @@ def compute_metrics(mels, secret, label, filter_gen_output, filter_disc_output, 
 
 
 def compile_metrics(metrics):
-    return {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric in
-            metric_dict.items()}
+    metrics = {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric in
+               metric_dict.items()}
+    return metrics
 
 
 def aggregate_metrics(batch_metrics, metrics):
@@ -103,6 +109,8 @@ def aggregate_metrics(batch_metrics, metrics):
             metrics[k] = []
         if isinstance(v, np.ndarray):
             metrics[k].append(v.item())
+        elif isinstance(v, int):
+            metrics[k].append(v)
         else:
             raise NotImplementedError(f'Unexpected format of metric: {k}, {v}')
 

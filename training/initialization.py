@@ -14,8 +14,9 @@ import log
 
 class TrainingConfig:
     def __init__(self, lr, run_name='tmp', train_batch_size=128, test_batch_size=128, train_num_workers=2,
-                 test_num_workers=2, save_interval=1, checkpoint_interval=1, updates_per_evaluation=50,
-                 gradient_accumulation=1, epochs=2, n_samples=5, do_log=True, librosa_audio_mel=False):
+                 test_num_workers=2, save_interval=5, checkpoint_interval=1, updates_per_evaluation=50,
+                 updates_per_train_log_commit=10, gradient_accumulation=1, epochs=2, n_generated_samples=1, do_log=True,
+                 librosa_audio_mel=False):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
@@ -24,10 +25,11 @@ class TrainingConfig:
         self.save_interval = save_interval
         self.checkpoint_interval = checkpoint_interval
         self.updates_per_evaluation = updates_per_evaluation
+        self.updates_per_train_log_commit = updates_per_train_log_commit
         self.gradient_accumulation = gradient_accumulation
         self.lr = lr
         self.epochs = epochs
-        self.n_samples = n_samples
+        self.n_generated_samples = n_generated_samples
         self.do_log = do_log
         self.librosa_audio_mel = librosa_audio_mel
 
@@ -62,12 +64,14 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
 
     filter_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size,
                             image_width=image_width, image_height=image_height, noise_dim=unet_config.noise_dim,
-                            n_classes=n_genders, embedding_dim=unet_config.embedding_dim, use_cond=False).to(
+                            n_classes=n_genders, embedding_dim=unet_config.embedding_dim,
+                            use_cond=unet_config.use_cond).to(
         device)
     filter_disc = load_modified_AlexNet(n_genders).to(device)
     secret_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size,
                             image_width=image_width, image_height=image_height, noise_dim=unet_config.noise_dim,
-                            n_classes=n_genders, embedding_dim=unet_config.embedding_dim, use_cond=False).to(
+                            n_classes=n_genders, embedding_dim=unet_config.embedding_dim,
+                            use_cond=unet_config.use_cond).to(
         device)
     secret_disc = load_modified_AlexNet(n_genders + 1).to(device)
 
@@ -92,10 +96,12 @@ def init_training(dataset_name, experiment_settings, device):
 
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
     test_female_speakar_ratio = sum(1 - test_data.gender_idx) / len(test_data.gender_idx)
-    print(f'Training set contains {train_data.n_speakers} speakers with {int(100*train_female_speakar_ratio)}% female speakers.'
-          f' Total size is {len(train_data.gender_idx)}')
-    print(f'Test set contains {test_data.n_speakers} speakers with {int(100*test_female_speakar_ratio)}% female speakers.'
-          f' Total size is {len(test_data.gender_idx)}')
+    print(
+        f'Training set contains {train_data.n_speakers} speakers with {int(100 * train_female_speakar_ratio)}% female speakers.'
+        f' Total size is {len(train_data.gender_idx)}')
+    print(
+        f'Test set contains {test_data.n_speakers} speakers with {int(100 * test_female_speakar_ratio)}% female speakers.'
+        f' Total size is {len(test_data.gender_idx)}')
 
     train_loader = DataLoader(train_data, training_config.train_batch_size,
                               num_workers=training_config.train_num_workers, shuffle=True)
@@ -115,4 +121,4 @@ def init_training(dataset_name, experiment_settings, device):
         log.init(utils.nestedConfigs2dict(experiment_settings), run_name=training_config.run_name)
 
     training_loop(train_loader, test_loader, training_config, models, optimizers, audio_mel_converter, loss_funcs,
-                  loss_config.gamma, loss_config.use_entropy_loss, audio_mel_config.sample_rate, device)
+                  loss_config, audio_mel_config.sample_rate, device, training_config.n_generated_samples)
