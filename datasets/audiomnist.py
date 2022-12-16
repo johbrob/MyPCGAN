@@ -50,3 +50,11 @@ class AudioMNIST(AudioDataset):
     @staticmethod
     def get_name() -> str:
         return 'AudioMNIST'
+
+    @staticmethod
+    def get_default_sampling_rate() -> int:
+        return 8000
+
+    @staticmethod
+    def get_default_segment_length() -> int:
+        return 8192

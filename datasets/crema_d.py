@@ -61,6 +61,13 @@ class CremaD(AudioDataset):
     def get_name() -> str:
         return 'Crema-D'
 
+    @staticmethod
+    def get_default_sampling_rate() -> int:
+        return 8000
+
+    @staticmethod
+    def get_default_segment_length() -> int:
+        return 40000
 
 if __name__ == '__main__':
     a = CremaD.load()

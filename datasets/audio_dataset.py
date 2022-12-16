@@ -53,8 +53,10 @@ class AudioDataset(Dataset):
         if not os.path.exists(cls.get_save_path()):
             print('No preprocessed data found...')
             if os.path.exists(cls.get_load_path()):
-                print('Raw dataset found...Start preprocessing')
-                cls._create_dataset(sampling_rate, segment_length, 0.20, even_gender)
+                print(f'Raw dataset found...Start preprocessing with sample rate {cls.get_default_sampling_rate()} '
+                      f'and segment_length {cls.get_default_segment_length()}')
+                cls._create_dataset(cls.get_default_sampling_rate(), cls.get_default_segment_length(), 0.20,
+                                    even_gender)
             else:
                 print('No raw dataset found...Make sure dataset is available')
 
@@ -87,4 +89,12 @@ class AudioDataset(Dataset):
     @staticmethod
     @abstractmethod
     def get_name() -> str:
+        pass
+
+    @staticmethod
+    def get_default_sampling_rate() -> int:
+        pass
+
+    @staticmethod
+    def get_default_segment_length() -> int:
         pass
