@@ -1,6 +1,6 @@
 from loss_compiling import LossConfig
-from nn.models import UnetConfig
-from nn.audio_mel import AudioMelConfig
+from neural_networks.models import UnetConfig
+from neural_networks.audio_mel import AudioMelConfig
 from training.initialization import TrainingConfig
 
 
@@ -42,5 +42,5 @@ def create_github_default_config():
 def create_github_lower_lr_config():
     # Missing settings: D_real_loss_weight, utility_loss, filter_receptive_field == kernel_size?
     return ExperimentConfig(training_config=TrainingConfig(lr=lr, run_name='github_lower_lr', epochs=50),
-                            audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(),
+                            audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(activation='leaky_relu'),
                             loss_compute_config=LossConfig(gamma=100, epsilon=1e-3))

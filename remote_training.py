@@ -1,11 +1,12 @@
-from DataManaging import AvailableDatasets
+from datasets import AvailableDatasets
 from training import init_training
 import argparse
 import configs
 import torch
 
 available_dataset = {
-    'audiomnist': AvailableDatasets.AudioMNIST
+    'audiomnist': AvailableDatasets.AudioMNIST,
+    'cremad': AvailableDatasets.CremaD
 }
 
 available_settings = {
@@ -30,7 +31,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'dataset': 'audiomnist', 'settings': 'github_lower_lr', 'gpu': 0}
+    args = {'dataset': 'cremad', 'settings': 'github_lower_lr', 'gpu': 0}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpu'] == 'no':

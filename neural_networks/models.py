@@ -1,25 +1,19 @@
-import torchvision.models as models
-import torch.nn as nn
-from torch.nn.functional import log_softmax
-from torchvision.models.alexnet import AlexNet
-import torch
-
-import argparse
-import os
-import random
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
+import torchvision.models
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-import torchvision.utils as vutils
-import numpy as np
-import librosa
-import soundfile as sf
-import wave
-from torch.nn.functional import relu, max_pool1d, sigmoid, log_softmax
+import torch.nn as nn
+import torch
+import enum
+
+available_activations = {'relu': torch.nn.ReLU, 'leaky_relu': torch.nn.LeakyReLU}
+
+
+def get_activation(activation):
+    if activation.lower() in available_activations:
+        return available_activations[activation.lower()]
+    else:
+        raise NotImplementedError(
+            f"activation '{activation} not found. Available activations are {available_activations.keys()}'")
 
 
 def weights_init(m):
@@ -31,19 +25,19 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 
-def double_conv(channels_in, channels_out, kernel_size):
+def double_conv(channels_in, channels_out, kernel_size, activation='relu'):
     return nn.Sequential(
         nn.utils.weight_norm(nn.Conv2d(channels_in, channels_out, kernel_size, padding=1)),
         nn.BatchNorm2d(channels_out),
-        nn.ReLU(),
+        get_activation(activation)(),
         nn.utils.weight_norm(nn.Conv2d(channels_out, channels_out, kernel_size, padding=1)),
         nn.BatchNorm2d(channels_out),
-        nn.ReLU()
+        get_activation(activation)()
     )
 
 
 class UnetConfig:
-    def __init__(self, kernel_size=3, embedding_dim=16, noise_dim=10, activation='sigmoid', use_cond=True):
+    def __init__(self, kernel_size=3, embedding_dim=16, noise_dim=10, activation='relu', use_cond=True):
         self.kernel_size = kernel_size
         self.embedding_dim = embedding_dim
         self.noise_dim = noise_dim
@@ -51,9 +45,9 @@ class UnetConfig:
         self.activation = activation
 
 
-class UNetFilter(nn.Module):
+class UNet(nn.Module):
     def __init__(self, channels_in, channels_out, chs, kernel_size=3, image_width=64, image_height=64,
-                 noise_dim=10, activation='sigmoid', n_classes=2, embedding_dim=16, use_cond=True):
+                 noise_dim=10, activation='relu', n_classes=2, embedding_dim=16, use_cond=True):
         super().__init__()
         # chs = [2, 4, 8, 16, 32]
         # chs=[32, 64, 128, 256, 512]
@@ -223,37 +217,46 @@ class AudioNet(nn.Module):
         return out, conv_out
 
 
-def load_modified_AlexNet(num_classes):
-    model = models.AlexNet(num_classes=num_classes)
+class AlexNet(nn.Module):
+    def __init__(self, num_classes, activation='relu'):
+        super().__init__()
+        self.model = torchvision.models.AlexNet(num_classes=num_classes)
 
-    # Make single input channel
-    model.features = nn.Sequential(
-        nn.Conv2d(1, 64, kernel_size=5, stride=1, padding=2),
-        nn.ReLU(inplace=True),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-        nn.Conv2d(64, 192, kernel_size=5, padding=2),
-        nn.ReLU(inplace=True),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-        nn.Conv2d(192, 384, kernel_size=3, padding=1),
-        nn.ReLU(inplace=True),
-        nn.Conv2d(384, 256, kernel_size=3, padding=1),
-        nn.ReLU(inplace=True),
-        nn.Conv2d(256, 256, kernel_size=3, padding=1),
-        nn.ReLU(inplace=True),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-    )
-    # Change number of output classes to num_classes
-    model.classifier = nn.Sequential(
-        nn.Dropout(),
-        nn.Linear(256 * 6 * 6, 1024),
-        nn.ReLU(inplace=True),
-        nn.Dropout(),
-        nn.Linear(1024, 1024),
-        nn.ReLU(inplace=True),
-        nn.Linear(1024, num_classes)
-    )
+        # Make single input channel
+        self.model.features = nn.Sequential(
+            nn.Conv2d(1, 64, kernel_size=5, stride=1, padding=2),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(64, 192, kernel_size=5, padding=2),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        # Change number of output classes to num_classes
+        self.model.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 6 * 6, 1024),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(1024, 1024),
+            get_activation(activation)(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.Linear(1024, num_classes))
 
-    return model
+    def forward(self, x):
+        return self.model.forward(x)
 
 
 class FID_AlexNet(AlexNet):
@@ -293,10 +296,16 @@ class FID_AlexNet(AlexNet):
         return out
 
 
-def load_modified_ResNet(num_classes):
-    model = models.resnet18()
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, num_classes)
-    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
-                            bias=False)
-    return model
+class ResNet18(nn.Module):
+    def __init__(self, num_classes, activation='relu', from_pretrained=False):
+        super().__init__()
+        self.model = torchvision.models.resnet18(from_pretrained=from_pretrained)
+        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+        self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+
+        for name, module in self.model.named_modules():
+            if hasattr(module, 'relu'):
+                module.relu = get_activation(activation)
+
+    def forward(self, x):
+        return self.model(x)

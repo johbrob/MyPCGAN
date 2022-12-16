@@ -96,12 +96,12 @@ def save_sample(save_dir, id, label, epoch, pred_label_male, pred_label_female, 
 # ----------- Path related stuff -----------
 
 
-def get_run_dir(run_name):
-    return local_vars.PWD + 'runs/audioMNIST/' + run_name
+def get_run_dir(dataset_name, run_name):
+    return local_vars.PWD + 'runs/' + dataset_name + '/' + run_name
 
 
-def create_run_subdir(run_name, sub_dir_name):
-    path = os.path.join(get_run_dir(run_name), sub_dir_name)
+def create_run_subdir(dataset_name, run_name, sub_dir_name):
+    path = os.path.join(get_run_dir(dataset_name, run_name), sub_dir_name)
     Path(path).mkdir(parents=True, exist_ok=True)
     return path
 

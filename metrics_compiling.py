@@ -40,7 +40,7 @@ def _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels):
             'female_adversarial': female_adversarial.detach().cpu().numpy(),
             # 'male_final': male_final.detach().cpu().numpy(),
             # 'female_final': female_final.detach().cpu().numpy(),
-            'male_femal_diff': male_female_diff.detach().cpu().numpy(),
+            'male_female_diff': male_female_diff.detach().cpu().numpy(),
             }
 
 

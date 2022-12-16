@@ -1,8 +1,8 @@
-from nn.models import load_modified_AlexNet, load_modified_ResNet, UNetFilter
-from DataManaging.AudioDatasets import AudioDataset
+from neural_networks.models import UNet, AlexNet, ResNet18
+from datasets import AvailableDatasets, AudioMNIST, CremaD
 from training.training import training_loop
 # from nn.modules import AudioMelConverter, CustomAudioMelConverter
-from nn.audio_mel import AudioMelConverter, CustomAudioMelConverter
+from neural_networks.audio_mel import AudioMelConverter, CustomAudioMelConverter
 from torch.utils.data import DataLoader
 from loss_compiling import HLoss
 import numpy as np
@@ -10,6 +10,11 @@ import local_vars
 import torch
 import utils
 import log
+
+dataset_to_name = {
+    AvailableDatasets.AudioMNIST: 'DAIS - AudioMNIST',
+    AvailableDatasets.CremaD: 'DAIS - Crema-D'
+}
 
 
 class TrainingConfig:
@@ -41,39 +46,29 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
     training_config = experiment_config.training_config
     unet_config = experiment_config.unet_config
 
-    # label_classifier = load_modified_ResNet(n_labels).to(device).eval()
-    # secret_classifier = load_modified_ResNet(n_genders).to(device).eval()
+    label_classifier = AlexNet(n_labels, activation='relu').to(device)
+    # label_classifier.model.load_state_dict(
+    #     torch.load('neural_networks/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
+    #                map_location=torch.device('cpu')))
 
-    # TODO: Fix loading state dicts
-    # tmp_lc = torch.load(local_vars.PWD + 'nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
-    #                     map_location=torch.device('cpu'))
-    label_classifier = load_modified_AlexNet(n_labels).to(device)
-    label_classifier.load_state_dict(torch.load('nn/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
-                                                map_location=torch.device('cpu')))
-
-    secret_classifier = load_modified_AlexNet(n_genders).to(device)
-    secret_classifier.load_state_dict(torch.load('nn/pretrained_weights/best_gender_alexnet_epoch_29.pt',
-                                                 map_location=torch.device('cpu')))
-    #
-    # secret_classifier.load_state_dict(
-    #     torch.load(local_vars.PWD + 'nn/pretrained_weights/best_gender_alexnet_epoch_29.pt'),
-    #     map_location=torch.device('cpu'))
+    secret_classifier = AlexNet(n_genders, activation='relu').to(device)
+    secret_classifier.model.load_state_dict(
+        torch.load('neural_networks/pretrained_weights/best_gender_alexnet_epoch_29.pt',
+                   map_location=torch.device('cpu')))
 
     loss_funcs = {'distortion': torch.nn.L1Loss(), 'entropy': HLoss(), 'adversarial': torch.nn.CrossEntropyLoss(),
                   'adversarial_rf': torch.nn.CrossEntropyLoss()}
 
-    filter_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size,
-                            image_width=image_width, image_height=image_height, noise_dim=unet_config.noise_dim,
-                            n_classes=n_genders, embedding_dim=unet_config.embedding_dim,
-                            use_cond=unet_config.use_cond).to(
+    filter_gen = UNet(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size, image_width=image_width,
+                      image_height=image_height, noise_dim=unet_config.noise_dim, n_classes=n_genders,
+                      embedding_dim=unet_config.embedding_dim, use_cond=unet_config.use_cond, activation='relu').to(
         device)
-    filter_disc = load_modified_AlexNet(n_genders).to(device)
-    secret_gen = UNetFilter(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size,
-                            image_width=image_width, image_height=image_height, noise_dim=unet_config.noise_dim,
-                            n_classes=n_genders, embedding_dim=unet_config.embedding_dim,
-                            use_cond=unet_config.use_cond).to(
+    filter_disc = AlexNet(n_genders, activation='leaky_relu').to(device)
+    secret_gen = UNet(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size, image_width=image_width,
+                      image_height=image_height, noise_dim=unet_config.noise_dim, n_classes=n_genders,
+                      embedding_dim=unet_config.embedding_dim, use_cond=unet_config.use_cond, activation='relu').to(
         device)
-    secret_disc = load_modified_AlexNet(n_genders + 1).to(device)
+    secret_disc = AlexNet(n_genders + 1, activation='leaky_relu').to(device)
 
     models = {
         'filter_gen': filter_gen, 'filter_disc': filter_disc, 'secret_gen': secret_gen, 'secret_disc': secret_disc,
@@ -89,10 +84,17 @@ def init_models(experiment_config, image_width, image_height, n_labels, n_gender
     return loss_funcs, models, optimizers
 
 
+def get_dataset(dataset_name):
+    if dataset_name == AvailableDatasets.AudioMNIST:
+        return AudioMNIST.load()
+    elif dataset_name == AvailableDatasets.CremaD:
+        return CremaD.load()
+
+
 def init_training(dataset_name, experiment_settings, device):
     training_config, audio_mel_config, unet_config, loss_config = experiment_settings.get_configs()
 
-    train_data, test_data = AudioDataset.load()
+    train_data, test_data = get_dataset(dataset_name)
 
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
     test_female_speakar_ratio = sum(1 - test_data.gender_idx) / len(test_data.gender_idx)
@@ -118,7 +120,8 @@ def init_training(dataset_name, experiment_settings, device):
                                                  train_data.n_genders, device)
 
     if training_config.do_log:
-        log.init(utils.nestedConfigs2dict(experiment_settings), run_name=training_config.run_name)
+        log.init(utils.nestedConfigs2dict(experiment_settings), project=dataset_to_name[dataset_name],
+                 run_name=training_config.run_name)
 
     training_loop(train_loader, test_loader, training_config, models, optimizers, audio_mel_converter, loss_funcs,
                   loss_config, audio_mel_config.sample_rate, device, training_config.n_generated_samples)

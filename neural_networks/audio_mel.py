@@ -1,4 +1,4 @@
-from nn.modules import weights_init, ResnetBlock, WNConv1d, WNConvTranspose1d
+from neural_networks.modules import weights_init, ResnetBlock, WNConv1d, WNConvTranspose1d
 from librosa.filters import mel as librosa_mel_fn
 from librosa.feature.inverse import mel_to_audio
 from librosa.feature import melspectrogram
@@ -153,7 +153,7 @@ class CustomAudioMelConverter():
                                               mel_fmin=audio_mel_config.mel_fmin, mel_fmax=audio_mel_config.mel_fmax)
         self.mel2audio_func = CustomMel2Audio(audio_mel_config.n_mels, ngf=32, n_residual_layers=3)
         self.mel2audio_func.load_state_dict(
-            torch.load(local_vars.PWD + 'nn/pretrained_weights/best_netG_epoch_2120.pt', map_location=torch.device('cpu')))
+            torch.load(local_vars.PWD + 'neural_networks/pretrained_weights/best_netG_epoch_2120.pt', map_location=torch.device('cpu')))
 
     def audio2mel(self, audio):
         return self.audio2mel_func(audio)

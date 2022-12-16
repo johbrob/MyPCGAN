@@ -1,8 +1,8 @@
-from dataset_creation import create_audio_dataset
+from abc import abstractmethod
 from torch.utils.data import Dataset
+from datasets import data_utils
 import pandas as pd
 import numpy as np
-import local_vars
 import librosa
 import torch
 import enum
@@ -10,11 +10,11 @@ import os
 
 
 class Gender(enum.Enum):
-    MALE = 1,
-    FEMALE = 2
+    FEMALE = 0,
+    MALE = 1
 
 
-def load_wav_to_torch(path, sampling_rate):
+def _load_wav_to_torch(path, sampling_rate):
     data, sampling_rate = librosa.core.load(path, sr=sampling_rate)
     data = 0.95 * librosa.util.normalize(data)
     return torch.from_numpy(data).float(), sampling_rate
@@ -42,31 +42,47 @@ class AudioDataset(Dataset):
 
     def __getitem__(self, item):
         audio_file = self.audio_files[item]
-        audio, sampling_rate = load_wav_to_torch(audio_file, self.sampling_rate)
+        audio, sampling_rate = _load_wav_to_torch(audio_file, self.sampling_rate)
         return audio, self.gender_idx[item], self.labels[item], self.speaker_id[item], self.audio_files[item]
 
     def __len__(self):
         return len(self.audio_files)
 
-    @staticmethod
-    def load(sampling_rate=8000, segment_length=8192, even_gender=True):
-        if not os.path.exists(local_vars.PREPROCESSED_AUDIO_MNIST_PATH):
+    @classmethod
+    def load(cls, sampling_rate=8000, segment_length=8192, even_gender=True):
+        if not os.path.exists(cls.get_save_path()):
             print('No preprocessed data found...')
-            if os.path.exists(local_vars.AUDIO_MNIST_PATH):
+            if os.path.exists(cls.get_load_path()):
                 print('Raw dataset found...Start preprocessing')
-                create_audio_dataset(local_vars.AUDIO_MNIST_PATH,
-                                     sampling_rate, segment_length,
-                                     local_vars.PREPROCESSED_AUDIO_MNIST_PATH,
-                                     0.20,
-                                     even_gender)
+                cls._create_dataset(sampling_rate, segment_length, 0.20, even_gender)
             else:
                 print('No raw dataset found...Make sure dataset is available')
 
         prefix = 'even_' if even_gender else ''
-        train_annotations = pd.read_csv(local_vars.PREPROCESSED_AUDIO_MNIST_PATH + prefix + 'train_annotations.csv')
-        trainData = AudioDataset(train_annotations, sampling_rate, segment_length)
+        train_annotations = pd.read_csv(cls.get_save_path() + prefix + 'train_annotations.csv')
+        trainData = cls(train_annotations, sampling_rate, segment_length)
 
-        test_annotations = pd.read_csv(local_vars.PREPROCESSED_AUDIO_MNIST_PATH + prefix + 'test_annotations.csv')
-        testData = AudioDataset(test_annotations, sampling_rate, segment_length)
+        test_annotations = pd.read_csv(cls.get_save_path() + prefix + 'test_annotations.csv')
+        testData = cls(test_annotations, sampling_rate, segment_length)
 
         return trainData, testData
+
+    @staticmethod
+    @abstractmethod
+    def _create_dataset(sampling_rate, segment_length, test_split_ratio, even_gender_proportions) -> None:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_load_path() -> str:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_save_path() -> str:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_name() -> str:
+        pass

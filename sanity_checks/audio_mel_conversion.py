@@ -1,5 +1,5 @@
-from DataManaging.AudioDatasets import AudioDataset
-from nn.audio_mel import CustomAudioMelConverter, AudioMelConfig
+from datasets.AudioDatasets import AudioDataset
+from neural_networks.audio_mel import CustomAudioMelConverter, AudioMelConfig
 from training.utils import preprocess_spectrograms
 import torch
 import local_vars

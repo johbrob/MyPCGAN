@@ -16,14 +16,14 @@ from torch import LongTensor
 def filter_gen_forward_pass(filter_gen, filter_disc, mels, secrets):
     filter_z = torch.randn(mels.shape[0], filter_gen.noise_dim).to(mels.device)
     filtered_mels = filter_gen(mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
-    filtered_mels, mean, std = preprocess_spectrograms(filtered_mels)
     filtered_secret_preds_gen = filter_disc(filtered_mels)  # (bsz, n_secret)
     return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen}
 
 
 def secret_gen_forward_pass(secret_gen, secret_disc, mels, filtered_mel):
     secret_z = torch.randn(mels.shape[0], secret_gen.noise_dim).to(mels.device)
-    fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], mels.shape[0]))).to(mels.device)  # (bsz,)
+    # fake_secret_gen = Variable(LongTensor(np.random.choice([0.0, 1.0], mels.shape[0]))).to(mels.device)  # (bsz,)
+    fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
     fake_mel = secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
     fake_secret_preds_gen = secret_disc(fake_mel)  # (bsz, n_secrets + 1)
     secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
@@ -128,8 +128,8 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
             batch_metrics = compile_metrics(batch_metrics)
             metrics = aggregate_metrics(batch_metrics, metrics)
 
-            do_log_eval = step_counter % training_config.updates_per_evaluation == 0
-            do_log_train = step_counter % training_config.updates_per_train_log_commit == 0
+            do_log_eval = total_steps % training_config.updates_per_evaluation == 0
+            do_log_train = total_steps % training_config.updates_per_train_log_commit == 0
             if training_config.do_log and (do_log_train or do_log_eval):
                 if do_log_eval:
                     val_metrics = evaluate_on_dataset(test_loader, audio_mel_converter, models, loss_funcs, loss_config,
@@ -141,12 +141,14 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
 
         if epoch % training_config.save_interval == 0:
             print("Saving data and mels samples.")
-            save_test_samples(utils.create_run_subdir(training_config.run_name, 'samples'), test_loader,
-                              audio_mel_converter, models, loss_funcs, epoch, sample_rate, device, n_generated_samples)
+            save_test_samples(
+                utils.create_run_subdir(train_loader.dataset.get_name(), training_config.run_name, 'samples'),
+                test_loader, audio_mel_converter, models, loss_funcs, epoch, sample_rate, device, n_generated_samples)
 
         if epoch % training_config.checkpoint_interval == 0:
-            utils.save_models_and_optimizers(utils.create_run_subdir(training_config.run_name, 'checkpoints'),
-                                             epoch, models, optimizers)
+            utils.save_models_and_optimizers(
+                utils.create_run_subdir(train_loader.dataset.get_name(), training_config.run_name, 'checkpoints'),
+                epoch, models, optimizers)
 
 
 def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, loss_config, device):

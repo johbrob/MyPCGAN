@@ -1,32 +1,14 @@
-import pandas
 import torch.nn.functional as F
-import local_vars
-# import scipy as scipy
-import scipy.io
 import pandas as pd
 import numpy as np
+import scipy.io
 import librosa
 import torch
 import tqdm
 import os
 
 
-def _load_raw(data_path):
-    data_path = data_path if data_path[-1] == '/' else data_path + '/'
-    annotation_file = data_path + 'data/audioMNIST_meta.txt'
-
-    annotations = pd.read_json(annotation_file, orient='index')
-
-    # gender_idx 'male': 1, 'female': 0
-    training_files = librosa.util.find_files(data_path)
-    speaker_ids = [int(f.split('/')[-2]) for f in training_files]
-    labels = np.array([int(f.split('/')[-1][0]) for f in training_files])
-    gender_idx = np.array([int(annotations.loc[i]['gender'] == 'male') for i in speaker_ids])
-
-    return pd.DataFrame({'file': training_files, 'gender': gender_idx, 'label': labels, 'speaker_id': speaker_ids})
-
-
-def _balanced_speaker_split(data, test_split_ratio, even_gender_proportions=True):
+def balanced_speaker_split(data, test_split_ratio, even_gender_proportions=True):
     data = data.sort_values(by=['gender', 'speaker_id'])
 
     # Extract speaker ids for respective gender
@@ -56,7 +38,7 @@ def _balanced_speaker_split(data, test_split_ratio, even_gender_proportions=True
     return train_data, test_data
 
 
-def _save_trimmed_and_padded_audio_files(annotations, sampling_rate, segment_length):
+def save_trimmed_and_padded_audio_files(annotations, sampling_rate, segment_length):
     audio_files = annotations['file'].to_numpy()
     save_paths = annotations['preprocessed_file'].to_numpy()
 
@@ -83,16 +65,16 @@ def _save_trimmed_and_padded_audio_files(annotations, sampling_rate, segment_len
         scipy.io.wavfile.write(save_path, sampling_rate, audio)
 
 
-def create_audio_dataset(data_path, sampling_rate, segment_length, save_path, test_split_ratio=0.20,
-                         even_gender_proportions=False):
-    annotations = _load_raw(data_path)
-    train_annotations, test_annotations = _balanced_speaker_split(annotations, test_split_ratio, even_gender_proportions)
+def create_dataset(data_path, sampling_rate, segment_length, save_path, load_raw_func, test_split_ratio=0.20,
+                   even_gender_proportions=False):
+    annotations = load_raw_func(data_path)
+    train_annotations, test_annotations = balanced_speaker_split(annotations, test_split_ratio, even_gender_proportions)
     train_annotations['preprocessed_file'] = [save_path + 'train' + file[len(data_path):] for file in
                                               train_annotations['file']]
     test_annotations['preprocessed_file'] = [save_path + 'test' + file[len(data_path):] for file in
                                              test_annotations['file']]
-    _save_trimmed_and_padded_audio_files(train_annotations, sampling_rate, segment_length)
-    _save_trimmed_and_padded_audio_files(test_annotations, sampling_rate, segment_length)
+    save_trimmed_and_padded_audio_files(train_annotations, sampling_rate, segment_length)
+    save_trimmed_and_padded_audio_files(test_annotations, sampling_rate, segment_length)
 
     train_annotations.rename(columns={'file': 'original_file'}, inplace=True)
     test_annotations.rename(columns={'file': 'original_file'}, inplace=True)
@@ -103,12 +85,3 @@ def create_audio_dataset(data_path, sampling_rate, segment_length, save_path, te
     test_annotations.to_csv(save_path + prefix + 'test_annotations.csv')
 
     pd.DataFrame([[1, 0]], columns=['male', 'female']).to_csv(save_path + prefix + 'gender_encoding.csv')
-
-
-if __name__ == '__main__':
-    sampling_rate = 8000
-    segment_length = 8192
-    load_path = local_vars.AUDIO_MNIST_PATH
-    save_path = local_vars.PREPROCESSED_AUDIO_MNIST_PATH
-    even_gender_proportions = True
-    create_audio_dataset(load_path, segment_length, sampling_rate, save_path, 0.20, even_gender_proportions)
