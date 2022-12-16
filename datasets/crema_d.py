@@ -45,7 +45,7 @@ class CremaD(AudioDataset):
         super().__init__(annotations, sampling_rate, segment_length)
 
     @staticmethod
-    def _create_dataset(sampling_rate, segment_length, test_split_ratio, even_gender_proportions):
+    def _create_dataset(sampling_rate=8000, segment_length=40000, test_split_ratio=0.2, even_gender_proportions=True):
         return create_crema_d(CremaD.get_load_path(), CremaD.get_save_path(), test_split_ratio, segment_length,
                               sampling_rate, even_gender_proportions)
 
@@ -68,6 +68,7 @@ class CremaD(AudioDataset):
     @staticmethod
     def get_default_segment_length() -> int:
         return 40000
+
 
 if __name__ == '__main__':
     a = CremaD.load()

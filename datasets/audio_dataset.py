@@ -49,31 +49,33 @@ class AudioDataset(Dataset):
         return len(self.audio_files)
 
     @classmethod
-    def load(cls, sampling_rate, segment_length, even_gender=True):
+    def load(cls, sampling_rate=None, segment_length=None, even_gender_proportions=None):
+        if sampling_rate is not None or segment_length is not None or even_gender_proportions is not None:
+            raise NotImplementedError("No support for custom settings for now")
+
         if not os.path.exists(cls.get_save_path()):
             print('No preprocessed data found...')
             if os.path.exists(cls.get_load_path()):
                 print(f'Raw dataset found...Start preprocessing with sample rate {cls.get_default_sampling_rate()} '
                       f'and segment_length {cls.get_default_segment_length()}')
-                cls._create_dataset(cls.get_default_sampling_rate(), cls.get_default_segment_length(), 0.20,
-                                    even_gender)
+                cls._create_dataset()
             else:
                 print('No raw dataset found...Make sure dataset is available')
 
-        prefix = 'even_' if even_gender else ''
+        prefix = 'even_' if even_gender_proportions is None or even_gender_proportions else ''
         save_path = cls.get_save_path() if cls.get_save_path()[-1] == '/' else cls.get_save_path() + '/'
 
         train_annotations = pd.read_csv(save_path + prefix + 'train_annotations.csv')
-        trainData = cls(train_annotations, sampling_rate, segment_length)
+        trainData = cls(train_annotations, cls.get_default_sampling_rate(), cls.get_default_segment_length())
 
         test_annotations = pd.read_csv(save_path + prefix + 'test_annotations.csv')
-        testData = cls(test_annotations, sampling_rate, segment_length)
+        testData = cls(test_annotations, cls.get_default_sampling_rate(), cls.get_default_segment_length())
 
         return trainData, testData
 
     @staticmethod
     @abstractmethod
-    def _create_dataset(sampling_rate, segment_length, test_split_ratio, even_gender_proportions) -> None:
+    def _create_dataset(sampling_rate=None, segment_length=None, test_split_ratio=None, even_gender_proportions=None) -> None:
         pass
 
     @staticmethod
