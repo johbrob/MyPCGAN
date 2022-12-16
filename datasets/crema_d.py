@@ -46,7 +46,8 @@ class CremaD(AudioDataset):
 
     @staticmethod
     def _create_dataset(sampling_rate, segment_length, test_split_ratio, even_gender_proportions):
-        return create_crema_d(sampling_rate, segment_length, test_split_ratio, even_gender_proportions)
+        return create_crema_d(CremaD.get_load_path(), CremaD.get_save_path(), test_split_ratio, segment_length,
+                              sampling_rate, even_gender_proportions)
 
     @staticmethod
     def get_load_path():

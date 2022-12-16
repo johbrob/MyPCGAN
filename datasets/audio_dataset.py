@@ -60,7 +60,7 @@ class AudioDataset(Dataset):
 
         prefix = 'even_' if even_gender else ''
         save_path = cls.get_save_path() if cls.get_save_path()[-1] == '/' else cls.get_save_path() + '/'
-        
+
         train_annotations = pd.read_csv(save_path + prefix + 'train_annotations.csv')
         trainData = cls(train_annotations, sampling_rate, segment_length)
 

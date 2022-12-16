@@ -36,7 +36,8 @@ class AudioMNIST(AudioDataset):
 
     @staticmethod
     def _create_dataset(sampling_rate, segment_length, test_split_ratio, even_gender_proportions):
-        return create_audiomnist(sampling_rate, segment_length, test_split_ratio, even_gender_proportions)
+        return create_audiomnist(AudioMNIST.get_load_path(), AudioMNIST.get_save_path(), test_split_ratio,
+                                 segment_length, sampling_rate, even_gender_proportions)
 
     @staticmethod
     def get_load_path():
@@ -49,4 +50,3 @@ class AudioMNIST(AudioDataset):
     @staticmethod
     def get_name() -> str:
         return 'AudioMNIST'
-
