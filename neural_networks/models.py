@@ -297,15 +297,25 @@ class FID_AlexNet(AlexNet):
 
 
 class ResNet18(nn.Module):
-    def __init__(self, num_classes, activation='relu', from_pretrained=False):
+    def __init__(self, num_classes, activation='relu', pretrained=False):
         super().__init__()
-        self.model = torchvision.models.resnet18(from_pretrained=from_pretrained)
+        self.model = torchvision.models.resnet18(pretrained=pretrained)
         self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
         self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
         for name, module in self.model.named_modules():
             if hasattr(module, 'relu'):
-                module.relu = get_activation(activation)
+                module.relu = get_activation(activation)()
 
     def forward(self, x):
         return self.model(x)
+
+
+
+
+if __name__ == '__main__':
+    print(ResNet18(2))
+    print('--------------------------------')
+    print(AlexNet(2))
+    print('--------------------------------')
+    print(UNet(1, 1, [8, 16, 32, 64, 128]))

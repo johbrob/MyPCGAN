@@ -59,10 +59,12 @@ class AudioDataset(Dataset):
                 print('No raw dataset found...Make sure dataset is available')
 
         prefix = 'even_' if even_gender else ''
-        train_annotations = pd.read_csv(cls.get_save_path() + prefix + 'train_annotations.csv')
+        save_path = cls.get_save_path() if cls.get_save_path()[-1] == '/' else cls.get_save_path() + '/'
+        
+        train_annotations = pd.read_csv(save_path + prefix + 'train_annotations.csv')
         trainData = cls(train_annotations, sampling_rate, segment_length)
 
-        test_annotations = pd.read_csv(cls.get_save_path() + prefix + 'test_annotations.csv')
+        test_annotations = pd.read_csv(save_path + prefix + 'test_annotations.csv')
         testData = cls(test_annotations, sampling_rate, segment_length)
 
         return trainData, testData

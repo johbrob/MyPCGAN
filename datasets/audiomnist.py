@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import local_vars
 import librosa
+import os
 
 
 def _load_raw_data(data_path):
@@ -21,8 +22,9 @@ def _load_raw_data(data_path):
     return pd.DataFrame({'file': training_files, 'gender': gender_idx, 'label': labels, 'speaker_id': speaker_ids})
 
 
-def create_audiomnist(data_path, sampling_rate, segment_length, save_path, test_split_ratio=0.20,
+def create_audiomnist(data_path, save_path, test_split_ratio=0.20, segment_length=8192, sampling_rate=8000,
                       even_gender_proportions=False):
+    save_path = os.path.join(save_path, AudioMNIST.get_name())
     data_utils.create_dataset(data_path, sampling_rate, segment_length, save_path, _load_raw_data, test_split_ratio,
                               even_gender_proportions)
 
@@ -42,7 +44,7 @@ class AudioMNIST(AudioDataset):
 
     @staticmethod
     def get_save_path():
-        return local_vars.PREPROCESSED_AUDIO_MNIST_PATH
+        return os.path.join(local_vars.PREPROCESSED_DATA_PATH, 'AudioMNIST')
 
     @staticmethod
     def get_name() -> str:

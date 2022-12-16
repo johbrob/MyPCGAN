@@ -7,6 +7,9 @@ import torch
 import tqdm
 import os
 
+import datasets
+import local_vars
+
 
 def balanced_speaker_split(data, test_split_ratio, even_gender_proportions=True):
     data = data.sort_values(by=['gender', 'speaker_id'])
@@ -46,9 +49,10 @@ def save_trimmed_and_padded_audio_files(annotations, sampling_rate, segment_leng
         audio, sampling_rate = librosa.core.load(file, sr=sampling_rate)
         audio = torch.from_numpy(audio).float()
 
-        # if audio.shape[0] > 8192:
-        #     print('Corrupted audio file')
-        #     print(f"has length {audio.shape[0]}")
+        if audio.shape[0] > segment_length:
+            print('File is longer than maximum segment_length')
+            # print('Corrupted audio file')
+            print(f"has length {audio.shape[0]}")
 
         if audio.shape[0] >= segment_length:
             audio = audio[:segment_length]
@@ -67,6 +71,8 @@ def save_trimmed_and_padded_audio_files(annotations, sampling_rate, segment_leng
 
 def create_dataset(data_path, sampling_rate, segment_length, save_path, load_raw_func, test_split_ratio=0.20,
                    even_gender_proportions=False):
+    save_path = save_path if save_path[-1] == '/' else save_path + '/'
+
     annotations = load_raw_func(data_path)
     train_annotations, test_annotations = balanced_speaker_split(annotations, test_split_ratio, even_gender_proportions)
     train_annotations['preprocessed_file'] = [save_path + 'train' + file[len(data_path):] for file in
@@ -85,3 +91,36 @@ def create_dataset(data_path, sampling_rate, segment_length, save_path, load_raw
     test_annotations.to_csv(save_path + prefix + 'test_annotations.csv')
 
     pd.DataFrame([[1, 0]], columns=['male', 'female']).to_csv(save_path + prefix + 'gender_encoding.csv')
+
+
+
+if __name__ == '__main__':
+    annotations = datasets.crema_d._load_raw(datasets.CremaD.get_load_path())
+    audio_files = annotations['file'].to_numpy()
+    # annotations['segment_length'] =
+
+    segment_lengths = []
+    speaker = 0
+
+    for file in tqdm.tqdm(audio_files, total=len(audio_files)):
+        audio, sampling_rate = librosa.core.load(file, sr=8000)
+        audio = torch.from_numpy(audio).float()
+
+
+        new_speaker = speaker != int(file.split('/')[-1].split('_')[0])
+        speaker = int(file.split('/')[-1].split('_')[0])
+        if new_speaker:
+            print('speaker:', speaker)
+
+        if audio.shape[0] > 40000:
+            print('File is longer than maximum segment_length')
+            # print('Corrupted audio file')
+            print(file)
+            print(f"has length {audio.shape[0]}")
+
+        segment_lengths.append(audio.shape[0])
+
+    annotations['segment_length'] = segment_lengths
+    annotations['segment_length'].hist(bins=100, density=True, cumulative=True)
+    import matplotlib.pyplot as plt
+    plt.show()

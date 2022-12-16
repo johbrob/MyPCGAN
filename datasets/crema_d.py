@@ -4,11 +4,13 @@ import pandas as pd
 import numpy as np
 import local_vars
 import librosa
+import os
 
 
-def create_crema_d(data_path, sampling_rate, segment_length, save_path, test_split_ratio=0.20,
+def create_crema_d(data_path, save_path, test_split_ratio=0.20, segment_length=21048, sampling_rate=8000,
                    even_gender_proportions=False):
-    data_utils.create_dataset(data_path, segment_length, sampling_rate, save_path, _load_raw, test_split_ratio,
+    save_path = os.path.join(save_path, CremaD.get_name())
+    data_utils.create_dataset(data_path, sampling_rate, segment_length, save_path, _load_raw, test_split_ratio,
                               even_gender_proportions)
 
 
@@ -52,7 +54,7 @@ class CremaD(AudioDataset):
 
     @staticmethod
     def get_save_path():
-        return local_vars.PREPROCESSED_CREMA_D_PATH
+        return os.path.join(local_vars.PREPROCESSED_DATA_PATH, 'Crema-D')
 
     @staticmethod
     def get_name() -> str:

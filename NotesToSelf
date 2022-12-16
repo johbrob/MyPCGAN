@@ -1,0 +1,51 @@
+TODO-list:
+----------------------------------------------------------------
+* Use Wandb for logging                                                                         DONE
+* fixed creation of model to be less hard coded. Have a look at unnecessary arguments etc       DONE
+* Create nicer structure for optimizers. A dictionary?                                          DONE
+* trainingObjects looks messy                                                                   DONE
+* loss tracking looks messy                                                                     DONE
+* initial models  in a nicer way                                                                DONE
+* Have a look at what is going on in each training pass                                         DONE
+* make test accuracy computation a bit nicer                                                    DONE
+* make saving of test samples a bit nicer                                                       DONE
+* check if experiment config is logged correctly                                                DONE
+* look with more detail into the different forward passes of the model                          DONE
+* make sure everything is logged in this repo as in the old repo (fixed_pred_something)         DONE
+* try run with github default settings                                                          DONE
+* Audio files not saving properly and not sounding properly                                     DONE
+* Fix audio file saving name                                                                    DONE
+* Fix saved audio file not sounding properly                                                    DONE
+    - pre-processed audio files do sound good                                                   DONE
+    - can we save files directly again and they still sound good?                               DONE
+    - can we save files later in the training loop and they still sound good?                   DONE
+    - Problem seem shape-related. Check shapes of tensors that we are trying to save            DONE
+* Check distortion loss between generated male and generated female                             DONE
+* No difference between fake_male_mel and fake_female_mel. Why?                                 DONE
+    * Do we update networks correctly?                                                          DONE
+        - Fixed bug using filter_gens learning rate for filter_disc                             DONE
+        - Fixed bug with not using conditional information in generative models                 DONE
+* Fixed logging stuff                                                                           DONE
+
+
+* How to improve GAN training:
+    - filtered_mel is probably not normalized. Try normalize it! NO Difference                  DONE
+    - How do we currently create noise? Uniform or spherically?                                 DONE
+    - Look into the modified loss stuff for GANS
+    - Apply some sort of batch normalization?
+    - What activation functions do we use? Try LeakyReLU
+    - What is PixelShuffle and is it something we should use?
+    - Label smoothing and occationally flip labels?
+    - What is DCGAN and how does hybrid models work?
+    - Replay buffer
+    - Swap current models of G and D with saved checkpoints of past generations
+    -
+* try run with paper settings
+* read up about GAN-losses
+* read up about how GANs generate images
+
+* make sure which values represent what in label/secret and make sure we track them correctly
+* ask about frozen_alex_net predictions and ask about target = secret - ones
+* what is ngf in mel2audio?
+
+* check order of variables when calculating accuracies for secret_disc

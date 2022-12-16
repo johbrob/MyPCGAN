@@ -19,7 +19,7 @@ available_settings = {
 def verify_args(args):
     assert args['dataset'] in available_dataset
     assert args['settings'] in available_settings
-    assert isinstance(args['gpu'], int) or args['gpu'].isdigit()
+    assert isinstance(args['gpu'], int) or args['gpu'].isdigit() or args['gpu'] == 'no'
 
 
 if __name__ == '__main__':
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'dataset': 'cremad', 'settings': 'github_lower_lr', 'gpu': 0}
+    args = {'dataset': 'cremad', 'settings': 'debug', 'gpu': 'no'}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpu'] == 'no':
