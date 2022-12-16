@@ -49,7 +49,7 @@ class AudioDataset(Dataset):
         return len(self.audio_files)
 
     @classmethod
-    def load(cls, sampling_rate=8000, segment_length=8192, even_gender=True):
+    def load(cls, sampling_rate, segment_length, even_gender=True):
         if not os.path.exists(cls.get_save_path()):
             print('No preprocessed data found...')
             if os.path.exists(cls.get_load_path()):

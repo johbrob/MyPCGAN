@@ -21,7 +21,7 @@ class TrainingConfig:
     def __init__(self, lr, run_name='tmp', train_batch_size=128, test_batch_size=128, train_num_workers=2,
                  test_num_workers=2, save_interval=5, checkpoint_interval=1, updates_per_evaluation=50,
                  updates_per_train_log_commit=10, gradient_accumulation=1, epochs=2, n_generated_samples=1, do_log=True,
-                 librosa_audio_mel=False):
+                 librosa_audio_mel=False, deterministic=False):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
@@ -37,6 +37,7 @@ class TrainingConfig:
         self.n_generated_samples = n_generated_samples
         self.do_log = do_log
         self.librosa_audio_mel = librosa_audio_mel
+        self.deterministic = deterministic
 
     def random_id(self):
         return str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
@@ -45,6 +46,11 @@ class TrainingConfig:
 def init_models(experiment_config, image_width, image_height, n_labels, n_genders, device):
     training_config = experiment_config.training_config
     unet_config = experiment_config.unet_config
+
+    if training_config.deterministic:
+        torch.manual_seed(0)
+        np.random.seed(0)
+        torch.backends.cudnn.benchmark = True
 
     label_classifier = AlexNet(n_labels, activation='relu').to(device)
     # label_classifier.model.load_state_dict(
