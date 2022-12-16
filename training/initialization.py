@@ -43,14 +43,29 @@ class TrainingConfig:
         return str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
 
 
+def set_seed(seed: int = 42) -> None:
+    import random
+    import os
+
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # When running on the CuDNN backend, two further options must be set
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # Set a fixed value for the hash seed
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    print(f"Random seed set as {seed}")
+
+
+
 def init_models(experiment_config, image_width, image_height, n_labels, n_genders, device):
     training_config = experiment_config.training_config
     unet_config = experiment_config.unet_config
 
     if training_config.deterministic:
-        torch.manual_seed(0)
-        np.random.seed(0)
-        torch.backends.cudnn.benchmark = True
+        set_seed(0)
 
     label_classifier = AlexNet(n_labels, activation='relu').to(device)
     # label_classifier.model.load_state_dict(
