@@ -57,7 +57,7 @@ def secret_disc_forward_pass(secret_disc, mels, fake_mel):
             'fake_secret': fake_secret_disc}
 
 
-def forward_pass(models, optimizers, mels, secrets, loss_funcs, loss_config, total_steps, gradient_accumulation):
+def forward_pass(models, optimizers, mels, secrets, loss_funcs, loss_config, total_steps=None, gradient_accumulation=None):
     assert mels.dim() == 4
 
     # filter_gen
