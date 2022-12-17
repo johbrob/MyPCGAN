@@ -16,10 +16,8 @@ from torch import LongTensor
 def filter_gen_forward_pass(filter_gen, filter_disc, mels, secrets):
     filter_z = torch.randn(mels.shape[0], filter_gen.noise_dim).to(mels.device)
     filtered_mels = filter_gen(mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
-    with torch.no_grad():
-        from training.initialization import set_seed
-        set_seed(15)
-        filtered_secret_preds_gen = filter_disc(filtered_mels)  # (bsz, n_secret)
+    # with torch.no_grad():
+    filtered_secret_preds_gen = filter_disc(filtered_mels)  # (bsz, n_secret)
     return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen}
 
 

@@ -56,7 +56,7 @@ def set_seed(seed: int = 42) -> None:
     torch.backends.cudnn.benchmark = False
     # Set a fixed value for the hash seed
     os.environ["PYTHONHASHSEED"] = str(seed)
-    print(f"Random seed set as {seed}")
+    # print(f"Random seed set as {seed}")
 
 
 
@@ -127,9 +127,9 @@ def init_training(dataset_name, experiment_settings, device):
         f' Total size is {len(test_data.gender_idx)}')
 
     train_loader = DataLoader(train_data, training_config.train_batch_size,
-                              num_workers=training_config.train_num_workers, shuffle=True)
+                              num_workers=training_config.train_num_workers, shuffle=not training_config.deterministic)
     test_loader = DataLoader(test_data, training_config.test_batch_size,
-                             num_workers=training_config.test_num_workers, shuffle=True)
+                             num_workers=training_config.test_num_workers, shuffle=not training_config.deterministic)
 
     if training_config.librosa_audio_mel:
         audio_mel_converter = AudioMelConverter(audio_mel_config)
