@@ -46,7 +46,7 @@ def filter_disc_forward_pass(filter_disc, mels, filtered_mels):
 
 def secret_disc_forward_pass(secret_disc, mels, fake_mel):
     fake_secret_preds_disc = secret_disc(fake_mel.detach().clone())  # (bsz, n_secrets + 1)
-    real_secret_preds_disc = secret_disc(mels, frozen=True)  # (bsz, n_secrets + 1)
+    real_secret_preds_disc = secret_disc(mels)  # (bsz, n_secrets + 1)
     fake_secret_disc = 2 * torch.ones(mels.size(0), requires_grad=False, dtype=torch.int64 ).to(mels.device)  # (bsz,)
     return {'fake_secret_score': fake_secret_preds_disc, 'real_secret_score': real_secret_preds_disc,
             'fake_secret': fake_secret_disc}
