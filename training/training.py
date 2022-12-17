@@ -142,21 +142,18 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, lo
 
     metrics = {}
 
-    for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
-        # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
-        labels, secrets = labels.to(device), secrets.to(device)
-        mels = audio_mel_converter.audio2mel(data).detach()  # spectrogram: (bsz, n_mels, frames)
-        mels, means, stds = preprocess_spectrograms(mels)
-        mels = mels.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
+    with torch.no_grad():
+        for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
+            # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
+            labels, secrets = labels.to(device), secrets.to(device)
+            mels = audio_mel_converter.audio2mel(data).detach()  # spectrogram: (bsz, n_mels, frames)
+            mels, means, stds = preprocess_spectrograms(mels)
+            mels = mels.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
 
-        with torch.no_grad():
-            filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
-                                                                                                        mels,
+            filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models, mels,
                                                                                                         secrets)
-
             losses = loss_compiling.compute_losses(loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
                                                    secret_gen_output, secret_disc_output, loss_config)
-
             batch_metrics = compute_metrics(mels, secrets, labels, filter_gen_output, filter_disc_output,
                                             secret_gen_output,
                                             secret_disc_output, losses, loss_funcs)

@@ -84,64 +84,64 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
     utils.set_mode(models, utils.Mode.EVAL)
     noise_dim = models['filter_gen'].noise_dim
     models['filter_gen'].to(device)
+    with torch.no_grad():
+        for i, (data, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples',
+                                                         total=len(data_loader)):
+    
+            if i >= n_samples_generated:
+                break
 
-    for i, (data, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples',
-                                                     total=len(data_loader)):
+            data, secret, label, id = data[:1], secret[:1], label[:1], id[:1]
+            # data: (1 x seq_len), secret: (1,), label: (1,), id: (1,)
 
-        if i >= n_samples_generated:
-            break
+            label, secret = label.to(device), secret.to(device)
+            original_mel = audio_mel_converter.audio2mel(data).detach()
+            mel, means, stds = preprocess_spectrograms(original_mel)
+            mel = mel.unsqueeze(dim=1).to(device)
 
-        data, secret, label, id = data[:1], secret[:1], label[:1], id[:1]
-        # data: (1 x seq_len), secret: (1,), label: (1,), id: (1,)
+            # filter_gen
+            filter_z = torch.randn(mel.shape[0], noise_dim).to(device)
+            filtered = models['filter_gen'](mel, filter_z, secret.long()).detach()
 
-        label, secret = label.to(device), secret.to(device)
-        original_mel = audio_mel_converter.audio2mel(data).detach()
-        mel, means, stds = preprocess_spectrograms(original_mel)
-        mel = mel.unsqueeze(dim=1).to(device)
+            # secret_gen
+            secret_z = torch.randn(mel.shape[0], noise_dim).to(device)
+            # fake_secret_male = Variable(LongTensor(mel.size(0)).fill_(1.0), requires_grad=False).to(device)
+            fake_secret_male = torch.ones(mel.size(0), requires_grad=False, dtype=torch.int64).to(device)
+            # fake_secret_female = Variable(LongTensor(mel.size(0)).fill_(0.0), requires_grad=False).to(device)
+            fake_secret_female = torch.zeros(mel.size(0), requires_grad=False, dtype=torch.int64).to(device)
+            fake_mel_male = models['secret_gen'](filtered, secret_z, fake_secret_male).detach()
+            fake_mel_female = models['secret_gen'](filtered, secret_z, fake_secret_female).detach()
 
-        # filter_gen
-        filter_z = torch.randn(mel.shape[0], noise_dim).to(device)
-        filtered = models['filter_gen'](mel, filter_z, secret.long()).detach()
+            # predict label
+            pred_label_male = torch.argmax(models['label_classifier'](fake_mel_male).data, 1)
+            pred_label_female = torch.argmax(models['label_classifier'](fake_mel_female).data, 1)
 
-        # secret_gen
-        secret_z = torch.randn(mel.shape[0], noise_dim).to(device)
-        # fake_secret_male = Variable(LongTensor(mel.size(0)).fill_(1.0), requires_grad=False).to(device)
-        fake_secret_male = torch.ones(mel.size(0), requires_grad=False, dtype=torch.int64).to(device)
-        # fake_secret_female = Variable(LongTensor(mel.size(0)).fill_(0.0), requires_grad=False).to(device)
-        fake_secret_female = torch.zeros(mel.size(0), requires_grad=False, dtype=torch.int64).to(device)
-        fake_mel_male = models['secret_gen'](filtered, secret_z, fake_secret_male).detach()
-        fake_mel_female = models['secret_gen'](filtered, secret_z, fake_secret_female).detach()
+            # predict secret
+            pred_secret_male = torch.argmax(models['secret_classifier'](fake_mel_male).data, 1)
+            pred_secret_female = torch.argmax(models['secret_classifier'](fake_mel_female).data, 1)
 
-        # predict label
-        pred_label_male = torch.argmax(models['label_classifier'](fake_mel_male).data, 1)
-        pred_label_female = torch.argmax(models['label_classifier'](fake_mel_female).data, 1)
+            # distortions
+            filtered_distortion = loss_func['distortion'](mel, filtered).item()
+            male_distortion = loss_func['distortion'](mel, fake_mel_male).item()
+            female_distortion = loss_func['distortion'](mel, fake_mel_female).item()
+            sample_distortion = loss_func['distortion'](fake_mel_male, fake_mel_female).item()
 
-        # predict secret
-        pred_secret_male = torch.argmax(models['secret_classifier'](fake_mel_male).data, 1)
-        pred_secret_female = torch.argmax(models['secret_classifier'](fake_mel_female).data, 1)
+            unnormalized_filtered_mel = torch.squeeze(filtered, 1).to(device) * 3 * stds.to(device) + means.to(device)
+            unnormalized_fake_mel_male = torch.squeeze(fake_mel_male, 1).to(device) * 3 * stds.to(device) + means.to(device)
+            unnormalized_fake_mel_female = torch.squeeze(fake_mel_female, 1).to(device) * 3 * stds.to(device) + means.to(
+                device)
+            unnormalized_spectrograms = torch.squeeze(mel.to(device) * 3 * stds.to(device) + means.to(device))
 
-        # distortions
-        filtered_distortion = loss_func['distortion'](mel, filtered).item()
-        male_distortion = loss_func['distortion'](mel, fake_mel_male).item()
-        female_distortion = loss_func['distortion'](mel, fake_mel_female).item()
-        sample_distortion = loss_func['distortion'](fake_mel_male, fake_mel_female).item()
+            # TODO: These could be on gpu if we use MelGAnGenerator
+            filtered_audio = audio_mel_converter.mel2audio(unnormalized_filtered_mel.squeeze().detach().cpu())
+            audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male.squeeze().detach().cpu())
+            audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female.squeeze().detach().cpu())
 
-        unnormalized_filtered_mel = torch.squeeze(filtered, 1).to(device) * 3 * stds.to(device) + means.to(device)
-        unnormalized_fake_mel_male = torch.squeeze(fake_mel_male, 1).to(device) * 3 * stds.to(device) + means.to(device)
-        unnormalized_fake_mel_female = torch.squeeze(fake_mel_female, 1).to(device) * 3 * stds.to(device) + means.to(
-            device)
-        unnormalized_spectrograms = torch.squeeze(mel.to(device) * 3 * stds.to(device) + means.to(device))
+            utils.save_sample(utils.create_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
+                              pred_label_female, filtered_audio, audio_male, audio_female, data.squeeze(), sampling_rate)
 
-        # TODO: These could be on gpu if we use MelGAnGenerator
-        filtered_audio = audio_mel_converter.mel2audio(unnormalized_filtered_mel.squeeze().detach().cpu())
-        audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male.squeeze().detach().cpu())
-        audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female.squeeze().detach().cpu())
-
-        utils.save_sample(utils.create_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
-                          pred_label_female, filtered_audio, audio_male, audio_female, data.squeeze(), sampling_rate)
-
-        comparison_plot_pcgan(original_mel, unnormalized_filtered_mel, unnormalized_fake_mel_male,
-                              unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
-                              pred_label_male, pred_label_female, male_distortion, female_distortion, sample_distortion,
-                              utils.create_subdir(example_dir, 'spectrograms'), epoch, id)
+            comparison_plot_pcgan(original_mel, unnormalized_filtered_mel, unnormalized_fake_mel_male,
+                                  unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
+                                  pred_label_male, pred_label_female, male_distortion, female_distortion, sample_distortion,
+                                  utils.create_subdir(example_dir, 'spectrograms'), epoch, id)
     print("Success!")
