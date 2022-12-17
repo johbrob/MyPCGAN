@@ -26,14 +26,20 @@ def secret_gen_forward_pass(secret_gen, secret_disc, mels, filtered_mel):
     secret_z = torch.randn(mels.shape[0], secret_gen.noise_dim).to(mels.device)
     fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
     fake_mel = secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
+    utils.freeze(secret_disc)
     fake_secret_preds_gen = secret_disc(fake_mel)  # (bsz, n_secrets + 1)
+    utils.unfreeze(secret_disc)
     secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
                          'fake_secret_score': fake_secret_preds_gen}
 
     generate_both_genders = True
     if generate_both_genders:
+        utils.freeze(secret_gen)
+        utils.freeze(secret_disc)
         alt_fake_mel = secret_gen(filtered_mel.detach(), secret_z, 1 - fake_secret_gen)  # (bsz, 1, n_mels, frames)
         alt_fake_secret_preds_gen = secret_disc(alt_fake_mel)  # (bsz, n_secrets + 1)
+        utils.unfreeze(secret_gen)
+        utils.unfreeze(secret_disc)
         secret_gen_output.update({'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen})
 
     return secret_gen_output
