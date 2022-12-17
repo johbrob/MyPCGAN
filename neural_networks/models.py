@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch
 import enum
 
+import utils
+
 available_activations = {'relu': torch.nn.ReLU, 'leaky_relu': torch.nn.LeakyReLU}
 
 
@@ -95,7 +97,9 @@ class UNet(nn.Module):
         self.dconv_up2 = double_conv(chs[1] + chs[0], chs[0], kernel_size)
         self.dconv_up1 = nn.Conv2d(chs[0], channels_out, kernel_size=1)
 
-    def forward(self, x, z, cond):
+    def forward(self, x, z, cond, frozen=False):
+        if frozen:
+            utils.freeze(self)
 
         bsz, chs, wth, hgt = x.shape[0], x.shape[1], x.shape[2], x.shape[3]
 
@@ -155,6 +159,9 @@ class UNet(nn.Module):
         conv1_up = self.dconv_up1(conv2_up)
 
         out = torch.tanh(conv1_up)
+
+        if frozen:
+            utils.unfreeze(self)
 
         return out
 
@@ -255,8 +262,15 @@ class AlexNet(nn.Module):
             # nn.ReLU(inplace=True),
             nn.Linear(1024, num_classes))
 
-    def forward(self, x):
-        return self.model.forward(x)
+    def forward(self, x, frozen=False):
+        if frozen:
+            utils.freeze(self)
+
+        out = self.model(x)
+
+        if frozen:
+            utils.unfreeze(self)
+        return out
 
 
 class FID_AlexNet(AlexNet):
@@ -307,8 +321,16 @@ class ResNet18(nn.Module):
             if hasattr(module, 'relu'):
                 module.relu = get_activation(activation)()
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, x, frozen=False):
+        if frozen:
+            utils.freeze(self)
+
+        out = self.model(x)
+
+        if frozen:
+            utils.unfreeze(self)
+
+        return out
 
 
 
