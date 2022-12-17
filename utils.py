@@ -62,12 +62,12 @@ def save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers):
 
 
 def freeze(model):
-    for param in model.parameters:
+    for param in model.parameters():
         param.requires_grad = False
 
 
 def unfreeze(model):
-    for param in model.parameters:
+    for param in model.parameters():
         param.requires_grad = False
 
 # ----------- Saving Audio stuff -----------
