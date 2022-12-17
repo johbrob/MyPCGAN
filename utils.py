@@ -61,6 +61,15 @@ def save_models_and_optimizers(checkpoint_dir, epoch, models, optimizers):
         torch.save(v.state_dict(), os.path.join(checkpoint_dir, f'optimizer_{k}_latest_epoch_{epoch}.pt'))
 
 
+def freeze(model):
+    for param in model.parameters:
+        param.requires_grad = False
+
+
+def unfreeze(model):
+    for param in model.parameters:
+        param.requires_grad = False
+
 # ----------- Saving Audio stuff -----------
 
 
@@ -131,6 +140,9 @@ def has_gradients(model, model_name):
         print(f'{model_name} has no gradients')
     else:
         print(f'{model_name} has gradients and largest is {max_abs_grad}')
+
+
+
 
 
 if __name__ == '__main__':
