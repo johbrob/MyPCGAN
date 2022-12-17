@@ -123,7 +123,7 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
                     log.metrics(metrics, total_steps, suffix='train', commit=False)
                 log.metrics({'Epoch': epoch + (i / len(train_loader))}, total_steps, commit=True)
 
-            if total_steps % training_config.gradent_accumulation == 0:
+            if total_steps % training_config.gradient_accumulation == 0:
                 utils.backward(losses)
                 utils.step(optimizers)
                 utils.zero_grad(optimizers)
@@ -156,6 +156,8 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, lo
             # filter_gen
             from loss_compiling import _compute_filter_gen_loss, _compute_secret_gen_loss, _compute_filter_disc_loss, \
                 _compute_secret_disc_loss
+
+
             filter_gen_output = filter_gen_forward_pass(models['filter_gen'], models['filter_disc'], mels, secrets)
             filter_gen_loss = _compute_filter_gen_loss(loss_funcs, mels, secrets, filter_gen_output, loss_config)
 
