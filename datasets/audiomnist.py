@@ -35,7 +35,7 @@ class AudioMNIST(AudioDataset):
         super().__init__(annotations, sampling_rate, segment_length)
 
     @staticmethod
-    def _create_dataset(sampling_rate, segment_length, test_split_ratio, even_gender_proportions):
+    def _create_dataset(sampling_rate=8000, segment_length=8192, test_split_ratio=0.2, even_gender_proportions=True):
         return create_audiomnist(AudioMNIST.get_load_path(), AudioMNIST.get_save_path(), test_split_ratio,
                                  segment_length, sampling_rate, even_gender_proportions)
 

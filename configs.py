@@ -49,7 +49,9 @@ def create_github_lower_lr_config():
 def create_deterministic_config():
     # Missing settings: D_real_loss_weight, utility_loss, filter_receptive_field == kernel_size?
     return ExperimentConfig(
-        training_config=TrainingConfig(lr=lr, run_name='small_deterministic', epochs=50, train_batch_size=64,
-                                       test_batch_size=64, deterministic=True),
+        training_config=TrainingConfig(lr=lr, run_name='small_deterministic', epochs=1000, train_batch_size=128,
+                                       test_batch_size=128, deterministic=True, gradient_accumulation=2,
+                                       save_interval=50, checkpoint_interval=50, updates_per_train_log_commit=50,
+                                       updates_per_evaluation=100),
         audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(activation='relu'),
         loss_compute_config=LossConfig())
