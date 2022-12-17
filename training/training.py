@@ -152,9 +152,7 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, models, loss_funcs, lo
         with torch.no_grad():
             filter_gen_output, filter_disc_output, secret_gen_output, secret_disc_output = forward_pass(models,
                                                                                                         mels,
-                                                                                                        secrets,
-                                                                                                        loss_funcs,
-                                                                                                        loss_config)
+                                                                                                        secrets)
 
             losses = loss_compiling.compute_losses(loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
                                                    secret_gen_output, secret_disc_output, loss_config)
