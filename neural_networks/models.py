@@ -337,16 +337,15 @@ class FID_AlexNet(AlexNet):
 
 
 class ResNetConfig:
-    def __init__(self, activation='relu', pretrained=False, n_classes=None):
+    def __init__(self, activation='relu', n_classes=None):
         self.activation = activation
-        self.pretrained = pretrained
         self.n_classes = n_classes
 
 
 class ResNet18(nn.Module):
-    def __init__(self, n_classes, activation='relu', pretrained=False):
+    def __init__(self, n_classes, activation='relu'):
         super().__init__()
-        self.model = torchvision.models.resnet18(pretrained=pretrained)
+        self.model = torchvision.models.resnet18()
         self.model.fc = nn.Linear(self.model.fc.in_features, n_classes)
         self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
