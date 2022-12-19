@@ -2,12 +2,17 @@ import torch.nn.functional as F
 import torchvision.models
 import torch.utils.data
 import torch.nn as nn
+import utils
 import torch
 import enum
 
-import utils
-
 available_activations = {'relu': torch.nn.ReLU, 'leaky_relu': torch.nn.LeakyReLU}
+
+
+class AvailableModels(enum.Enum):
+    UNET = 0
+    ALEXNET = 1
+    RESNET18 = 2
 
 
 def get_activation(activation):
@@ -38,24 +43,36 @@ def double_conv(channels_in, channels_out, kernel_size, activation='relu'):
     )
 
 
-class UnetConfig:
-    def __init__(self, kernel_size=3, embedding_dim=16, noise_dim=10, activation='relu', use_cond=True):
+class UNetConfig:
+    def __init__(self, channels_in=1, channels_out=1, hidden_channels=None, kernel_size=3, embedding_dim=16, noise_dim=10, activation='relu',
+                 use_cond=True, n_classes=None):
+        self.channels_in = channels_in
+        self.channels_out = channels_out
+        if hidden_channels:
+            self.hidden_channels = hidden_channels
+        else:
+            self.hidden_channels = [8, 16, 32, 64, 128]
         self.kernel_size = kernel_size
         self.embedding_dim = embedding_dim
         self.noise_dim = noise_dim
         self.use_cond = use_cond
         self.activation = activation
 
+        n_classes = n_classes
+
 
 class UNet(nn.Module):
-    def __init__(self, channels_in, channels_out, chs, kernel_size=3, image_width=64, image_height=64,
+    def __init__(self, channels_in=1, channels_out=1, hidden_channels=None, kernel_size=3, image_width=64, image_height=64,
                  noise_dim=10, activation='relu', n_classes=2, embedding_dim=16, use_cond=True):
         super().__init__()
         # chs = [2, 4, 8, 16, 32]
         # chs=[32, 64, 128, 256, 512]
         self.channels_in = channels_in
         self.channels_out = channels_out
-        self.chs = chs
+        if hidden_channels:
+            self.hidden_channels = hidden_channels
+        else:
+            self.hidden_channels = [8, 16, 32, 64, 128]
         self.kernel_size = kernel_size
         self.image_width = image_width
         self.image_height = image_height
@@ -69,33 +86,36 @@ class UNet(nn.Module):
         self.d = 16
 
         # noise projection layer
-        self.project_noise = nn.Linear(noise_dim, (image_width // self.d) * (image_height // self.d) * chs[-1])
+        self.project_noise = nn.Linear(noise_dim,
+                                       (image_width // self.d) * (image_height // self.d) * hidden_channels[-1])
 
         # condition projection layer
         self.project_cond = nn.Linear(embedding_dim, (image_width // self.d) * (image_height // self.d))
 
-        self.dconv_down1 = double_conv(channels_in, chs[0], kernel_size)
+        self.dconv_down1 = double_conv(channels_in, hidden_channels[0], kernel_size)
         self.pool_down1 = nn.MaxPool2d(2, stride=2)
 
-        self.dconv_down2 = double_conv(chs[0], chs[1], kernel_size)
+        self.dconv_down2 = double_conv(hidden_channels[0], hidden_channels[1], kernel_size)
         self.pool_down2 = nn.MaxPool2d(2, stride=2)
 
-        self.dconv_down3 = double_conv(chs[1], chs[2], kernel_size)
+        self.dconv_down3 = double_conv(hidden_channels[1], hidden_channels[2], kernel_size)
         self.pool_down3 = nn.MaxPool2d(2, stride=2)
 
-        self.dconv_down4 = double_conv(chs[2], chs[3], kernel_size)
+        self.dconv_down4 = double_conv(hidden_channels[2], hidden_channels[3], kernel_size)
         self.pool_down4 = nn.MaxPool2d(2, stride=2)
 
-        self.dconv_down5 = double_conv(chs[3], chs[4], kernel_size)
+        self.dconv_down5 = double_conv(hidden_channels[3], hidden_channels[4], kernel_size)
 
         if self.use_cond:
-            self.dconv_up5 = double_conv(chs[4] + chs[4] + 1 + chs[3], chs[3], kernel_size)
+            self.dconv_up5 = double_conv(hidden_channels[4] + hidden_channels[4] + 1 + hidden_channels[3],
+                                         hidden_channels[3], kernel_size)
         else:
-            self.dconv_up5 = double_conv(chs[4] + chs[4] + chs[3], chs[3], kernel_size)
-        self.dconv_up4 = double_conv(chs[3] + chs[2], chs[2], kernel_size)
-        self.dconv_up3 = double_conv(chs[2] + chs[1], chs[1], kernel_size)
-        self.dconv_up2 = double_conv(chs[1] + chs[0], chs[0], kernel_size)
-        self.dconv_up1 = nn.Conv2d(chs[0], channels_out, kernel_size=1)
+            self.dconv_up5 = double_conv(hidden_channels[4] + hidden_channels[4] + hidden_channels[3],
+                                         hidden_channels[3], kernel_size)
+        self.dconv_up4 = double_conv(hidden_channels[3] + hidden_channels[2], hidden_channels[2], kernel_size)
+        self.dconv_up3 = double_conv(hidden_channels[2] + hidden_channels[1], hidden_channels[1], kernel_size)
+        self.dconv_up2 = double_conv(hidden_channels[1] + hidden_channels[0], hidden_channels[0], kernel_size)
+        self.dconv_up1 = nn.Conv2d(hidden_channels[0], channels_out, kernel_size=1)
 
     def forward(self, x, z, cond, frozen=False):
         if frozen:
@@ -124,7 +144,7 @@ class UNet(nn.Module):
 
         noise = self.project_noise(z)
         # noise = noise.reshape(bsz, 128 * chs, hgh // 16, wth // 16)
-        noise = noise.reshape(bsz, self.chs[-1] * chs, wth // self.d, hgt // self.d)
+        noise = noise.reshape(bsz, self.hidden_channels[-1] * chs, wth // self.d, hgt // self.d)
 
         if self.use_cond:
             cond_emb = self.embed_condition(cond)
@@ -224,10 +244,16 @@ class AudioNet(nn.Module):
         return out, conv_out
 
 
+class AlexNetConfig:
+    def __init__(self, activation='relu', n_classes=None):
+        self.activation = activation
+        self.n_classes = n_classes
+
+
 class AlexNet(nn.Module):
-    def __init__(self, num_classes, activation='relu'):
+    def __init__(self, n_classes, activation='relu'):
         super().__init__()
-        self.model = torchvision.models.AlexNet(num_classes=num_classes)
+        self.model = torchvision.models.AlexNet(num_classes=n_classes)
 
         # Make single input channel
         self.model.features = nn.Sequential(
@@ -260,7 +286,7 @@ class AlexNet(nn.Module):
             nn.Linear(1024, 1024),
             get_activation(activation)(inplace=True),
             # nn.ReLU(inplace=True),
-            nn.Linear(1024, num_classes))
+            nn.Linear(1024, n_classes))
 
     def forward(self, x, frozen=False):
         if frozen:
@@ -274,8 +300,8 @@ class AlexNet(nn.Module):
 
 
 class FID_AlexNet(AlexNet):
-    def __init__(self, num_classes):
-        super(FID_AlexNet, self).__init__(num_classes)
+    def __init__(self, n_classes):
+        super(FID_AlexNet, self).__init__(n_classes)
         # Change to single input channel
         self.features = nn.Sequential(
             nn.Conv2d(1, 64, kernel_size=5, stride=1, padding=2),
@@ -300,7 +326,7 @@ class FID_AlexNet(AlexNet):
             nn.Dropout(),
             nn.Linear(1024, 1024),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, num_classes)
+            nn.Linear(1024, n_classes)
         )
 
     def forward(self, x):
@@ -308,6 +334,13 @@ class FID_AlexNet(AlexNet):
         out = self.avgpool(out)
         out = torch.flatten(out, 1)
         return out
+
+
+class ResNetConfig:
+    def __init__(self, activation='relu', pretrained=False, n_classes=None):
+        self.activation = activation
+        self.pretrained = pretrained
+        self.n_classes = n_classes
 
 
 class ResNet18(nn.Module):
@@ -333,6 +366,9 @@ class ResNet18(nn.Module):
         return out
 
 
+MODEL_MAP = {AvailableModels.UNET: UNet,
+             AvailableModels.ALEXNET: AlexNet,
+             AvailableModels.RESNET18: ResNet18}
 
 
 if __name__ == '__main__':

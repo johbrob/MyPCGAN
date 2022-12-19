@@ -87,7 +87,7 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
     with torch.no_grad():
         for i, (data, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples',
                                                          total=len(data_loader)):
-    
+
             if i >= n_samples_generated:
                 break
 
@@ -105,9 +105,7 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
 
             # secret_gen
             secret_z = torch.randn(mel.shape[0], noise_dim).to(device)
-            # fake_secret_male = Variable(LongTensor(mel.size(0)).fill_(1.0), requires_grad=False).to(device)
             fake_secret_male = torch.ones(mel.size(0), requires_grad=False, dtype=torch.int64).to(device)
-            # fake_secret_female = Variable(LongTensor(mel.size(0)).fill_(0.0), requires_grad=False).to(device)
             fake_secret_female = torch.zeros(mel.size(0), requires_grad=False, dtype=torch.int64).to(device)
             fake_mel_male = models['secret_gen'](filtered, secret_z, fake_secret_male).detach()
             fake_mel_female = models['secret_gen'](filtered, secret_z, fake_secret_female).detach()

@@ -1,5 +1,5 @@
 from loss_compiling import LossConfig
-from neural_networks.models import UnetConfig
+from neural_networks.models import UNetConfig
 from neural_networks.audio_mel import AudioMelConfig
 from training.initialization import TrainingConfig
 
@@ -22,14 +22,14 @@ def create_debug_config():
     return ExperimentConfig(
         training_config=TrainingConfig(lr=lr, run_name='debug', train_batch_size=8, test_batch_size=8,
                                        train_num_workers=1, test_num_workers=1, updates_per_evaluation=1, do_log=False),
-        audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(), loss_compute_config=LossConfig())
+        audio_mel_config=AudioMelConfig(), unet_config=UNetConfig(), loss_compute_config=LossConfig())
 
 
 def create_github_default_config():
     # Missing settings: D_real_loss_weight, utility_loss, filter_receptive_field == kernel_size?
     return ExperimentConfig(training_config=TrainingConfig(lr={k: 10 * v for k, v in lr.items()},
                                                            run_name='github_default', epochs=10),
-                            audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(),
+                            audio_mel_config=AudioMelConfig(), unet_config=UNetConfig(),
                             loss_compute_config=LossConfig())
 
 
@@ -42,7 +42,7 @@ def create_github_default_config():
 def create_github_lower_lr_config():
     # Missing settings: D_real_loss_weight, utility_loss, filter_receptive_field == kernel_size?
     return ExperimentConfig(training_config=TrainingConfig(lr=lr, run_name='github_lower_lr', epochs=50),
-                            audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(activation='leaky_relu'),
+                            audio_mel_config=AudioMelConfig(), unet_config=UNetConfig(activation='leaky_relu'),
                             loss_compute_config=LossConfig(gamma=100, epsilon=1e-3))
 
 
@@ -53,5 +53,5 @@ def create_deterministic_config():
                                        test_batch_size=128, deterministic=True, gradient_accumulation=2,
                                        save_interval=50, checkpoint_interval=50, updates_per_train_log_commit=50,
                                        updates_per_evaluation=100),
-        audio_mel_config=AudioMelConfig(), unet_config=UnetConfig(activation='relu'),
+        audio_mel_config=AudioMelConfig(), unet_config=UNetConfig(activation='relu'),
         loss_compute_config=LossConfig())
