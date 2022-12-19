@@ -31,4 +31,4 @@ Q = [
         loss_config=LossConfig())
 ]
 
-print(len(Q))
+print('Experiment queue has length', len(Q))

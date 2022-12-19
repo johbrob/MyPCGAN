@@ -72,7 +72,6 @@ def forward_pass(models, mels, secrets):
 
 def training_loop(train_loader, test_loader, training_config, models, optimizers, audio_mel_converter, loss_funcs,
                   loss_config, sample_rate, device):
-    print('here we are')
     utils.zero_grad(optimizers)
     total_steps = 0
     for epoch in range(0, training_config.epochs):

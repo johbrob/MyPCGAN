@@ -78,7 +78,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'dataset': 'cremad', 'experiment': 'debug', 'gpus': [-1]}
+    # args = {'dataset': 'cremad', 'experiment': 'debug', 'gpus': [-1]}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpus'] == [-1]:
