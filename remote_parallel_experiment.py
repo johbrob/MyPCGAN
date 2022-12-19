@@ -42,6 +42,8 @@ def parallel_experiment_wrapper(queue, experiment_setting, dataset, device):
 
 
 def parallel_experiment_queue(queue, dataset, workers):
+    print('Experiment queue has length', len(queue))
+
     import torch.multiprocessing as mp
     mp.set_start_method('spawn')
 
@@ -72,7 +74,7 @@ def verify_args(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", help="name of dataset", default='audiomnist')
-    parser.add_argument("-e", "--experiments", help="which pre-defined experiment queue to run", default='debug')
+    parser.add_argument("-e", "--experiment", help="which pre-defined experiment queue to run", default='debug')
     parser.add_argument('-g', "--gpus", nargs="+", type=int, help="specify which gpus to use. Enter '-1' to use cpu."
                                                                   "Will also use cpu if no gpu is available")
     args = parser.parse_args()
