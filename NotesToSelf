@@ -5,7 +5,7 @@ TODO-list:
 * Create nicer structure for optimizers. A dictionary?                                          DONE
 * trainingObjects looks messy                                                                   DONE
 * loss tracking looks messy                                                                     DONE
-* initial models  in a nicer way                                                                DONE
+* initiate models  in a nicer way                                                               DONE
 * Have a look at what is going on in each training pass                                         DONE
 * make test accuracy computation a bit nicer                                                    DONE
 * make saving of test samples a bit nicer                                                       DONE
@@ -26,20 +26,28 @@ TODO-list:
         - Fixed bug using filter_gens learning rate for filter_disc                             DONE
         - Fixed bug with not using conditional information in generative models                 DONE
 * Fixed logging stuff                                                                           DONE
-
+* Fix torch.no_grad() and gradient accumulation                                                 DONE
+* Try generate crema-D with seqment_length=40 000. See how it works. Sounds good?               DONE
 
 * How to improve GAN training:
-    - filtered_mel is probably not normalized. Try normalize it! NO Difference                  DONE
-    - How do we currently create noise? Uniform or spherically?                                 DONE
+    - filtered_mel is probably not normalized. Try normalize it! RESULT: No Difference          DONE
+    - How do we currently create noise? Uniform or spherically? RESULT: Already spherically     DONE
+
     - Look into the modified loss stuff for GANS
     - Apply some sort of batch normalization?
+        * Currently batchNorms in gen and in resnet
+        * Could try add it to AlexNet
     - What activation functions do we use? Try LeakyReLU
+        * Try use LeakyReLU in discs (suggested in DCGAN)
+        * Try also use LeakyReLU in gen (read in tips & tricks)
+        * Check which values are reasonable for LeakyReLU slope
+
     - What is PixelShuffle and is it something we should use?
-    - Label smoothing and occationally flip labels?
+    - Label smoothing and occasionally flip labels?
     - What is DCGAN and how does hybrid models work?
     - Replay buffer
     - Swap current models of G and D with saved checkpoints of past generations
-    -
+    - Can try predict genders of unfiltered data in filter_disc as well
 * try run with paper settings
 * read up about GAN-losses
 * read up about how GANs generate images
