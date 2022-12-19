@@ -10,6 +10,11 @@ import time
 import log
 
 
+def label_smoothing(labels):
+    # TODO: Implement label smoothing
+    pass
+
+
 def filter_gen_forward_pass(filter_gen, filter_disc, mels, secrets):
     filter_z = torch.randn(mels.shape[0], filter_gen.noise_dim).to(mels.device)
     filtered_mels = filter_gen(mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
@@ -52,18 +57,10 @@ def secret_disc_forward_pass(secret_disc, mels, fake_mel):
 
 def forward_pass(models, mels, secrets):
     assert mels.dim() == 4
-
-    # filter_gen
     filter_gen_output = filter_gen_forward_pass(models['filter_gen'], models['filter_disc'], mels, secrets)
-
-    # secret_gen
     secret_gen_output = secret_gen_forward_pass(models['secret_gen'], models['secret_disc'], mels,
                                                 filter_gen_output['filtered_mel'])
-
-    # filter_disc
     filter_disc_output = filter_disc_forward_pass(models['filter_disc'], mels, filter_gen_output['filtered_mel'])
-
-    # secret_disc
     secret_disc_output = secret_disc_forward_pass(models['secret_disc'], mels, secret_gen_output['faked_mel'])
 
     label_preds = models['label_classifier'](secret_gen_output['faked_mel'])
@@ -75,6 +72,7 @@ def forward_pass(models, mels, secrets):
 
 def training_loop(train_loader, test_loader, training_config, models, optimizers, audio_mel_converter, loss_funcs,
                   loss_config, sample_rate, device):
+    print('here we are')
     utils.zero_grad(optimizers)
     total_steps = 0
     for epoch in range(0, training_config.epochs):

@@ -81,7 +81,7 @@ if __name__ == '__main__':
     args = {'dataset': 'cremad', 'experiment': 'debug', 'gpus': [-1]}
     verify_args(args)
 
-    if not torch.cuda.is_available() or args['gpu'] == [-1]:
+    if not torch.cuda.is_available() or args['gpus'] == [-1]:
         print("Using CPU worker:")
         workers = [WorkerConfig('cpu')]
     elif (len(args['gpus']) <= 0):
