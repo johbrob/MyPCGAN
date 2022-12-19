@@ -11,7 +11,7 @@ import torch
 
 class AudioMelConfig:
     def __init__(self, n_fft=1024, hop_length=256, win_length=1024, sample_rate=8000, n_mels=80, center=False,
-                 mel_fmin=0.0, mel_fmax=None):
+                 mel_fmin=0.0, mel_fmax=None, pretrained_path=False):
         self.n_fft = n_fft
         self.sample_rate = sample_rate          # 22050
         self.hop_length = hop_length
@@ -20,6 +20,11 @@ class AudioMelConfig:
         self.center = center
         self.mel_fmin = mel_fmin
         self.mel_fmax = mel_fmax
+
+        self.pretrained_path = pretrained_path
+
+
+
 
 
 class AudioMelConverter():
@@ -146,14 +151,16 @@ class CustomAudioMelConverter():
         self.mel_fmin = audio_mel_config.mel_fmin
         self.mel_fmax = audio_mel_config.mel_fmax
 
+        assert audio_mel_config.pretrained_path
+
         self.audio2mel_func = CustomAudio2Mel(n_fft=audio_mel_config.n_fft, hop_length=audio_mel_config.hop_length,
                                               win_length=audio_mel_config.win_length,
                                               sampling_rate=audio_mel_config.sample_rate,
                                               n_mel_channels=audio_mel_config.n_mels,
                                               mel_fmin=audio_mel_config.mel_fmin, mel_fmax=audio_mel_config.mel_fmax)
         self.mel2audio_func = CustomMel2Audio(audio_mel_config.n_mels, ngf=32, n_residual_layers=3)
-        self.mel2audio_func.load_state_dict(
-            torch.load(local_vars.PWD + 'neural_networks/pretrained_weights/best_netG_epoch_2120.pt', map_location=torch.device('cpu')))
+        self.mel2audio_func.load_state_dict(torch.load(audio_mel_config.pretrained_path, map_location=torch.device('cpu')))
+        # local_vars.PWD + 'neural_networks/pretrained_weights/best_netG_epoch_2120.pt'
 
     def audio2mel(self, audio):
         return self.audio2mel_func(audio)

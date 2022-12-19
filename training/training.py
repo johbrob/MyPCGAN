@@ -10,11 +10,6 @@ import time
 import log
 
 
-def label_smoothing(labels):
-    # TODO: Implement label smoothing
-    pass
-
-
 def filter_gen_forward_pass(filter_gen, filter_disc, mels, secrets):
     filter_z = torch.randn(mels.shape[0], filter_gen.noise_dim).to(mels.device)
     filtered_mels = filter_gen(mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)

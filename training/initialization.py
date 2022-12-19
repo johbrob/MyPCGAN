@@ -18,7 +18,7 @@ class TrainingConfig:
     def __init__(self, lr=None, run_name='tmp', train_batch_size=128, test_batch_size=128, do_train_shuffle=True,
                  do_test_shuffle=True, train_num_workers=2, test_num_workers=2, save_interval=5, checkpoint_interval=1,
                  updates_per_evaluation=50, updates_per_train_log_commit=10, gradient_accumulation=1, epochs=2,
-                 n_generated_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False):
+                 n_generated_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False, betas=None):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
@@ -31,10 +31,18 @@ class TrainingConfig:
         self.updates_per_evaluation = updates_per_evaluation
         self.updates_per_train_log_commit = updates_per_train_log_commit
         self.gradient_accumulation = gradient_accumulation
+
         if lr is None:
             self.lr = {'filter_gen': 0.0001, 'filter_disc': 0.0004, 'secret_gen': 0.0001, 'secret_disc': 0.0004}
         else:
             self.lr = lr
+
+        if betas is None:
+            self.betas = {'filter_gen': (0.5, 0.999), 'filter_disc': (0.5, 0.999),
+                          'secret_gen': (0.5, 0.999), 'secret_disc': (0.5, 0.999)}
+        else:
+            self.betas = betas
+
         self.epochs = epochs
         self.n_generated_samples = n_generated_samples
         self.do_log = do_log
@@ -82,8 +90,16 @@ def init_models(experiment_setup, device):
         secret_classifier.model.load_state_dict(
             torch.load(experiment_setup.secret_classifier.pretrained_path, map_location=torch.device('cpu')))
 
-    loss_funcs = {'distortion': torch.nn.L1Loss(), 'entropy': HLoss(), 'adversarial': torch.nn.CrossEntropyLoss(),
-                  'adversarial_rf': torch.nn.CrossEntropyLoss()}
+    loss_funcs = {'filter_gen_distortion': torch.nn.L1Loss(), 'filter_gen_entropy': HLoss(),
+                  'filter_gen_adversarial': torch.nn.CrossEntropyLoss(
+                      label_smoothing=experiment_setup.loss.filter_gen_label_smoothing),
+                  'filter_disc': torch.nn.CrossEntropyLoss(
+                      label_smoothing=experiment_setup.loss.filter_disc_label_smoothing),
+                  'secret_gen_distortion': torch.nn.L1Loss(), 'secret_gen_entropy': HLoss(),
+                  'secret_gen_adversarial': torch.nn.CrossEntropyLoss(
+                      label_smoothing=experiment_setup.loss.secret_gen_label_smoothing),
+                  'secret_disc': torch.nn.CrossEntropyLoss(
+                      label_smoothing=experiment_setup.loss.secret_disc_label_smoothing)}
 
     models = {
         'filter_gen': create_model_from_config(experiment_setup.filter_gen).to(device),
@@ -95,12 +111,12 @@ def init_models(experiment_setup, device):
     }
 
     lr = experiment_setup.training.lr
-
+    betas = experiment_setup.training.betas
     optimizers = {
-        'filter_gen': torch.optim.Adam(models['filter_gen'].parameters(), lr['filter_gen'], betas=(0.5, 0.9)),
-        'filter_disc': torch.optim.Adam(models['filter_disc'].parameters(), lr['filter_disc'], betas=(0.5, 0.9)),
-        'secret_gen': torch.optim.Adam(models['secret_gen'].parameters(), lr['secret_gen'], betas=(0.5, 0.9)),
-        'secret_disc': torch.optim.Adam(models['secret_disc'].parameters(), lr['secret_disc'], betas=(0.5, 0.9))
+        'filter_gen': torch.optim.Adam(models['filter_gen'].parameters(), lr['filter_gen'], betas['filter_gen']),
+        'filter_disc': torch.optim.Adam(models['filter_disc'].parameters(), lr['filter_disc'], betas['filter_disc']),
+        'secret_gen': torch.optim.Adam(models['secret_gen'].parameters(), lr['secret_gen'], betas['secret_gen']),
+        'secret_disc': torch.optim.Adam(models['secret_disc'].parameters(), lr['secret_disc'], betas['secret_disc'])
     }
     return loss_funcs, models, optimizers
 

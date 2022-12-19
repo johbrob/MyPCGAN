@@ -94,12 +94,12 @@ def compute_metrics(mels, secret, label, filter_gen_output, filter_disc_output, 
 
     return {'filter_gen': filter_gen_metrics, 'secret_gen': secret_gen_metrics,
             'filter_disc': filter_disc_metrics, 'secret_disc': secret_disc_metrics,
-            'alexNet_label_pred': label_prediction_metrics, 'alexNet_secret_pred': secret_prediction_metrics}
+            'label_classifier': label_prediction_metrics, 'secret_classifier': secret_prediction_metrics}
 
 
 def compile_metrics(metrics):
-    metrics = {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric in
-               metric_dict.items()}
+    metrics = {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric
+               in metric_dict.items()}
     return metrics
 
 
