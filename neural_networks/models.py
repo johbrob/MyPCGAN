@@ -344,10 +344,10 @@ class ResNetConfig:
 
 
 class ResNet18(nn.Module):
-    def __init__(self, num_classes, activation='relu', pretrained=False):
+    def __init__(self, n_classes, activation='relu', pretrained=False):
         super().__init__()
         self.model = torchvision.models.resnet18(pretrained=pretrained)
-        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+        self.model.fc = nn.Linear(self.model.fc.in_features, n_classes)
         self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
         for name, module in self.model.named_modules():

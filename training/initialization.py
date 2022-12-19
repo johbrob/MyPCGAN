@@ -1,12 +1,9 @@
-from neural_networks.models import UNet, AlexNet, ResNet18
 from datasets import AvailableDatasets, AudioMNIST, CremaD
 from training.training import training_loop
-# from nn.modules import AudioMelConverter, CustomAudioMelConverter
 from neural_networks.audio_mel import AudioMelConverter, CustomAudioMelConverter
 from torch.utils.data import DataLoader
 from loss_compiling import HLoss
 import numpy as np
-import local_vars
 import torch
 import utils
 import log
@@ -68,74 +65,42 @@ def create_model_from_config(config):
     return config.model(**vars(config.args))
 
 
-def init_models(experiment_setup, n_labels, device):
-    training_config = experiment_setup.training
-    filter_gen_config = experiment_setup.filter_gen
-    filter_disc_config = experiment_setup.filter_disc
-    secret_gen_config = experiment_setup.secret_gen
-    secret_disc_config = experiment_setup.secret_disc
-    label_classifier_config = experiment_setup.label_classifier
-    secret_classifier_config = experiment_setup.secret_classifier
-
-    # label_classifier_config.args.n_classes = n_labels
-    # secret_classifier_config.args.n_classes = n_labels
-
+def init_models(experiment_setup, device):
     if experiment_setup.training.deterministic:
         set_seed(0)
 
-    # label_classifier2 = AlexNet(n_labels, activation='relu').to(device)
-    # from torchvision.models import AlexNet
-    # label_classifier2 = AlexNet(2).to(device)
-    # label_classifier2.load_state_dict(
-    #     torch.load('neural_networks/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt',
-    #                map_location=torch.device(device)))
-    #
-    # label_classifier = create_model_from_config(label_classifier_config).to(device)
-    # if label_classifier_config.pretrained_path:
-    #     label_classifier.model.load_state_dict(
-    #         torch.load(label_classifier_config.pretrained_path, map_location=torch.device('cpu')))
-    # # 'neural_networks/pretrained_weights/best_digit_alexnet_spectrograms_epoch_26.pt'
-    #
-    # # secret_classifier = AlexNet(n_genders, activation=secret_classifier_config.activation).to(device)
-    # secret_classifier = create_model_from_config(secret_classifier_config).to(device)
-    # if secret_classifier_config.pretrained_path:
-    #     secret_classifier.model.load_state_dict(
-    #         torch.load(secret_classifier_config.pretrained_path, map_location=torch.device('cpu')))
-    # # 'neural_networks/pretrained_weights/best_gender_alexnet_epoch_29.pt'
+    # gender_classifier = ResNet18(2, 'relu').to(device)
+    # gender_classifier.model.load_state_dict(torch.load("neural_networks/pretrained_weights/best_gender_model.pt", map_location=torch.device('cpu')))  # privacy
+
+    label_classifier = create_model_from_config(experiment_setup.label_classifier).to(device)
+    if experiment_setup.label_classifier.pretrained_path:
+        label_classifier.model.load_state_dict(
+            torch.load(experiment_setup.label_classifier.pretrained_path, map_location=torch.device('cpu')))
+
+    secret_classifier = create_model_from_config(experiment_setup.secret_classifier).to(device)
+    if experiment_setup.secret_classifier.pretrained_path:
+        secret_classifier.model.load_state_dict(
+            torch.load(experiment_setup.secret_classifier.pretrained_path, map_location=torch.device('cpu')))
 
     loss_funcs = {'distortion': torch.nn.L1Loss(), 'entropy': HLoss(), 'adversarial': torch.nn.CrossEntropyLoss(),
                   'adversarial_rf': torch.nn.CrossEntropyLoss()}
 
-    # # filter_gen = UNet(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size, image_width=image_width,
-    # #                   image_height=image_height, noise_dim=unet_config.noise_dim, n_classes=n_genders,
-    # #                   embedding_dim=unet_config.embedding_dim, use_cond=unet_config.use_cond, activation='relu').to(
-    # #     device)
-    # # filter_disc = AlexNet(n_genders, activation='leaky_relu').to(device)
-    # # secret_gen = UNet(1, 1, chs=[8, 16, 32, 64, 128], kernel_size=unet_config.kernel_size, image_width=image_width,
-    # #                   image_height=image_height, noise_dim=unet_config.noise_dim, n_classes=n_genders,
-    # #                   embedding_dim=unet_config.embedding_dim, use_cond=unet_config.use_cond, activation='relu').to(
-    # #     device)
-    # # secret_disc = AlexNet(n_genders + 1, activation='leaky_relu').to(device)
-    #
-    # models = {
-    #     'filter_gen': filter_gen, 'filter_disc': filter_disc, 'secret_gen': secret_gen, 'secret_disc': secret_disc,
-    #     'label_classifier': label_classifier, 'secret_classifier': secret_classifier
-    # }
-
     models = {
-        'filter_gen': create_model_from_config(filter_gen_config).to(device),
-        'filter_disc': create_model_from_config(filter_disc_config).to(device),
-        'secret_gen': create_model_from_config(secret_gen_config).to(device),
-        'secret_disc': create_model_from_config(secret_disc_config).to(device),
-        # 'label_classifier': label_classifier,
-        # 'secret_classifier': secret_classifier
+        'filter_gen': create_model_from_config(experiment_setup.filter_gen).to(device),
+        'filter_disc': create_model_from_config(experiment_setup.filter_disc).to(device),
+        'secret_gen': create_model_from_config(experiment_setup.secret_gen).to(device),
+        'secret_disc': create_model_from_config(experiment_setup.secret_disc).to(device),
+        'label_classifier': label_classifier,
+        'secret_classifier': secret_classifier
     }
 
+    lr = experiment_setup.training.lr
+
     optimizers = {
-        'filter_gen': torch.optim.Adam(models['filter_gen'].parameters(), training_config.lr['filter_gen'], betas=(0.5, 0.9)),
-        'filter_disc': torch.optim.Adam(models['filter_disc'].parameters(), training_config.lr['filter_disc'], betas=(0.5, 0.9)),
-        'secret_gen': torch.optim.Adam(models['secret_gen'].parameters(), training_config.lr['secret_gen'], betas=(0.5, 0.9)),
-        'secret_disc': torch.optim.Adam(models['secret_disc'].parameters(), training_config.lr['secret_disc'], betas=(0.5, 0.9))
+        'filter_gen': torch.optim.Adam(models['filter_gen'].parameters(), lr['filter_gen'], betas=(0.5, 0.9)),
+        'filter_disc': torch.optim.Adam(models['filter_disc'].parameters(), lr['filter_disc'], betas=(0.5, 0.9)),
+        'secret_gen': torch.optim.Adam(models['secret_gen'].parameters(), lr['secret_gen'], betas=(0.5, 0.9)),
+        'secret_disc': torch.optim.Adam(models['secret_disc'].parameters(), lr['secret_disc'], betas=(0.5, 0.9))
     }
     return loss_funcs, models, optimizers
 
@@ -148,8 +113,6 @@ def get_dataset(dataset_name):
 
 
 def init_training(dataset, experiment_setup, device):
-    # training_config, audio_mel_config, unet_config, loss_config = experiment_setup.get_configs()
-
     train_data, test_data = get_dataset(dataset)
 
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
@@ -180,13 +143,14 @@ def init_training(dataset, experiment_setup, device):
     experiment_setup.secret_gen.args.image_height = image_height
     experiment_setup.secret_gen.args.n_classes = train_data.n_genders
     experiment_setup.secret_disc.args.n_classes = train_data.n_genders + 1
+    experiment_setup.label_classifier.args.n_classes = train_data.n_genders
+    experiment_setup.secret_classifier.args.n_classes = train_data.n_labels
 
-    loss_funcs, models, optimizers = init_models(experiment_setup, train_data.n_labels, device)
+    loss_funcs, models, optimizers = init_models(experiment_setup, device)
 
     if experiment_setup.training.do_log:
         log.init(utils.nestedConfigs2dict(experiment_setup), project=dataset_to_name[dataset],
                  run_name=experiment_setup.training.run_name)
 
     training_loop(train_loader, test_loader, experiment_setup.training, models, optimizers, audio_mel_converter,
-                  loss_funcs, experiment_setup.loss, experiment_setup.audio_mel.sample_rate, device,
-                  experiment_setup.training.n_generated_samples)
+                  loss_funcs, experiment_setup.loss, experiment_setup.audio_mel.sample_rate, device)

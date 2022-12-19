@@ -1,4 +1,4 @@
-from datasets.audio_dataset import AudioDataset
+from datasets.audio_dataset import AudioDataset, _load_wav_to_torch
 from datasets import data_utils
 import pandas as pd
 import numpy as np
@@ -35,14 +35,14 @@ def _load_raw(data_path):
 
     gender_idx = np.array([int(annotations.loc[i]['Sex'] == 'Male') for i in speaker_ids])
 
-    return pd.DataFrame({'file': files, 'label': sentence_ids, 'gender': gender_idx, 'emotion': emotion_ids,
-                         'emotion_level': emotion_level_ids, 'speaker_id': speaker_ids})
+    return pd.DataFrame({'file': files, 'label': emotion_ids, 'gender': gender_idx, 'speaker_id': speaker_ids})
 
 
 class CremaD(AudioDataset):
 
     def __init__(self, annotations, sampling_rate, segment_length):
         super().__init__(annotations, sampling_rate, segment_length)
+
 
     @staticmethod
     def _create_dataset(sampling_rate=8000, segment_length=40000, test_split_ratio=0.2, even_gender_proportions=True):

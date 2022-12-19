@@ -1,3 +1,4 @@
+import local_vars
 from experiment_runs import ExperimentSetup
 from loss_compiling import LossConfig
 from neural_networks import AvailableModels, UNet, UNetConfig, AlexNet, AlexNetConfig, ResNet18, ResNetConfig
@@ -23,12 +24,10 @@ Q = [
         filter_disc_config=ModelConfig(AlexNet, AlexNetConfig(activation='leaky_relu')),
         secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
         secret_disc_config=ModelConfig(AlexNet, AlexNetConfig(activation='leaky_relu')),
-        label_classifier_config=ModelConfig(AlexNet, AlexNetConfig(activation='relu'),
-                                            pretrained_path='neural_networks/pretrained_weights/'
-                                                            'best_digit_alexnet_spectrograms_epoch_26.pt'),
-        secret_classifier_config=ModelConfig(AlexNet, AlexNetConfig(activation='relu'),
-                                             pretrained_path='neural_networks/pretrained_weights/'
-                                                             'best_gender_alexnet_epoch_29.pt'),
+        label_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
+                                            pretrained_path=local_vars.CREMA_D_PRETRAINED_GENDER_CLASSIFIER_PATH),
+        secret_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
+                                             pretrained_path=local_vars.CREMA_D_PRETRAINED_EMOTION_CLASSIFIER_PATH),
         loss_config=LossConfig())
 ]
 

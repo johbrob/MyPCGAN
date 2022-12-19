@@ -1,6 +1,5 @@
 import loss_compiling
 from metrics_compiling import compute_metrics, compile_metrics, aggregate_metrics
-from loss_compiling import compute_losses
 from training.utils import preprocess_spectrograms
 from training.sampling import save_test_samples, generate_samples
 import numpy as np
@@ -75,7 +74,7 @@ def forward_pass(models, mels, secrets):
 
 
 def training_loop(train_loader, test_loader, training_config, models, optimizers, audio_mel_converter, loss_funcs,
-                  loss_config, sample_rate, device, n_generated_samples):
+                  loss_config, sample_rate, device):
     utils.zero_grad(optimizers)
     total_steps = 0
     for epoch in range(0, training_config.epochs):
@@ -129,7 +128,8 @@ def training_loop(train_loader, test_loader, training_config, models, optimizers
             print("Saving data and mels samples.")
             save_test_samples(
                 utils.create_run_subdir(train_loader.dataset.get_name(), training_config.run_name, 'samples'),
-                test_loader, audio_mel_converter, models, loss_funcs, epoch, sample_rate, device, n_generated_samples)
+                test_loader, audio_mel_converter, models, loss_funcs, epoch, sample_rate, device,
+                training_config.n_generated_samples)
 
         if epoch % training_config.checkpoint_interval == 0:
             utils.save_models_and_optimizers(

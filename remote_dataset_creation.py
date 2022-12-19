@@ -8,7 +8,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'dataset': 'audiomnist'}
+    args = {'dataset': 'cremad'}
 
     if args['dataset'] == 'audiomnist':
         create_audiomnist(local_vars.AUDIO_MNIST_PATH, local_vars.PREPROCESSED_DATA_PATH, 0.20, 8192, 8000, True)
