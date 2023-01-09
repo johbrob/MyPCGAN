@@ -69,12 +69,17 @@ def main():
     epoch = 10
     lr = 10e-4
 
+    if torch.cuda.is_available():
+        device = torch.device = '0'
+    else:
+        device = torch.device = 'cpu'
+
     print('load whisper...')
-    processor = AutoProcessor.from_pretrained("openai/whisper-small")
-    whisper_encoder = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-small").get_encoder()
+    processor = AutoProcessor.from_pretrained("openai/whisper-small").to(device)
+    whisper_encoder = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-small").get_encoder().to(device)
 
     embedding_dim = whisper_encoder.embed_positions.embedding_dim
-    model = BasicModel(embedding_dim, Aggregation.AVERAGE)
+    model = BasicModel(embedding_dim, Aggregation.AVERAGE).to(device)
 
     # print(model.get_encoder())
 
@@ -95,27 +100,21 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr)
     criterion = torch.nn.CrossEntropyLoss()
 
-    batch = next(iter(test_loader))
-    # a = data_collator(batch)
     def get_whisper_embeddings(data):
         input_features = [audio.numpy() for audio in data]
         input_features = processor(input_features, return_tensors="pt", sampling_rate=sampling_rate).input_features
         return whisper_encoder(input_features).last_hidden_state
-
-    embeddings = get_whisper_embeddings(batch[0])
-    print(embeddings.shape)
-    output = model(embeddings)
-    print(output.shape)
 
     model.train()
     optimizer.zero_grad()
 
     for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                       total=len(train_loader)):
+        data = data.to(device)
         embeddings = get_whisper_embeddings(data)
         output = model(embeddings)
 
-        loss = criterion(output, secrets)
+        loss = criterion(output.cpu(), secrets)
         loss.backward()
         optimizer.step()
 
