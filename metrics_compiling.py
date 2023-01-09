@@ -24,11 +24,11 @@ def _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels):
     female_scores = torch.stack([fake_scores[fake_secret] for fake_scores, fake_secret in
                                  zip(all_fake_scores, secret_gen_output['fake_secret'])])
 
-    male_female_diff = loss_funcs['distortion'](male_mels, female_mels)
-    male_distortion = loss_funcs['distortion'](male_mels, mels)
-    female_distortion = loss_funcs['distortion'](female_mels, mels)
-    male_adversarial = loss_funcs['adversarial'](male_scores, secret_gen_output['fake_secret'])
-    female_adversarial = loss_funcs['adversarial'](female_scores, secret_gen_output['fake_secret'])
+    male_female_diff = loss_funcs['secret_gen_distortion'](male_mels, female_mels)
+    male_distortion = loss_funcs['secret_gen_distortion'](male_mels, mels)
+    female_distortion = loss_funcs['secret_gen_distortion'](female_mels, mels)
+    male_adversarial = loss_funcs['secret_gen_adversarial'](male_scores, secret_gen_output['fake_secret'])
+    female_adversarial = loss_funcs['secret_gen_adversarial'](female_scores, secret_gen_output['fake_secret'])
 
     return {'distortion_loss': losses['secret_gen']['distortion'].detach().cpu().numpy(),
             'adversarial_loss': losses['secret_gen']['adversarial'].detach().cpu().numpy(),
@@ -109,7 +109,7 @@ def aggregate_metrics(batch_metrics, metrics):
             metrics[k] = []
         if isinstance(v, np.ndarray):
             metrics[k].append(v.item())
-        elif isinstance(v, int):
+        elif isinstance(v, int) or isinstance(v, float) or isinstance(v, np.float32) or isinstance(v, np.float64):
             metrics[k].append(v)
         else:
             raise NotImplementedError(f'Unexpected format of metric: {k}, {v}')

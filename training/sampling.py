@@ -119,10 +119,10 @@ def save_test_samples(example_dir, data_loader, audio_mel_converter, models, los
             pred_secret_female = torch.argmax(models['secret_classifier'](fake_mel_female).data, 1)
 
             # distortions
-            filtered_distortion = loss_func['distortion'](mel, filtered).item()
-            male_distortion = loss_func['distortion'](mel, fake_mel_male).item()
-            female_distortion = loss_func['distortion'](mel, fake_mel_female).item()
-            sample_distortion = loss_func['distortion'](fake_mel_male, fake_mel_female).item()
+            filtered_distortion = loss_func['secret_gen_distortion'](mel, filtered).item()
+            male_distortion = loss_func['secret_gen_distortion'](mel, fake_mel_male).item()
+            female_distortion = loss_func['secret_gen_distortion'](mel, fake_mel_female).item()
+            sample_distortion = loss_func['secret_gen_distortion'](fake_mel_male, fake_mel_female).item()
 
             unnormalized_filtered_mel = torch.squeeze(filtered, 1).to(device) * 3 * stds.to(device) + means.to(device)
             unnormalized_fake_mel_male = torch.squeeze(fake_mel_male, 1).to(device) * 3 * stds.to(device) + means.to(device)
