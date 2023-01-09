@@ -10,27 +10,6 @@ import enum
 import log
 
 
-@dataclass
-class DataCollatorSpeechClassification:
-    processor: Any
-
-    def __init__(self, encoder, sampling_rate):
-        self.sampling_rate = sampling_rate
-        self.encoder = encoder
-
-    def __call__(self, data: List[Union[torch.Tensor, Tuple[str]]]) -> Dict[str, torch.Tensor]:
-        input_features = [audio.numpy() for audio in data[0]]
-        input_features = self.processor(input_features, return_tensors="pt",
-                                        sampling_rate=self.sampling_rate).input_features
-        embeddings = self.encoder(input_features).last_hidden_state
-
-        return {'input_features': embeddings, 'labels': data[1]}
-        # print(embeddings)
-        # batch = {}
-        # batch['labels'] = data[1]
-        # return batch
-
-
 class Aggregation(enum.Enum):
     FIRST = 0
     LAST = 1
@@ -94,18 +73,16 @@ def main():
     embedding_dim = whisper_encoder.embed_positions.embedding_dim
     model = BasicModel(embedding_dim, aggreagtion).to(device)
 
-    # print(model.get_encoder())
-
     print('load data...')
     train_data, test_data = CremaD.load()
 
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
     test_female_speakar_ratio = sum(1 - test_data.gender_idx) / len(test_data.gender_idx)
-    print()
-    print(f'Training set contains {train_data.n_speakers} speakers with {int(100 * train_female_speakar_ratio)}% '
+
+    print(f'\nTraining set contains {train_data.n_speakers} speakers with {int(100 * train_female_speakar_ratio)}% '
           f'female speakers. Total size is {len(train_data.gender_idx)}')
     print(f'Test set contains {test_data.n_speakers} speakers with {int(100 * test_female_speakar_ratio)}% '
-          f'female speakers. Total size is {len(test_data.gender_idx)}')
+          f'female speakers. Total size is {len(test_data.gender_idx)}\n')
 
     train_loader = DataLoader(dataset=train_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
@@ -134,6 +111,7 @@ def main():
         all_train_loss = []
         for i, (data, secrets, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epochs),
                                                           total=len(train_loader)):
+
             embeddings = get_whisper_embeddings(data)
             output = model(embeddings)
 
@@ -144,12 +122,11 @@ def main():
 
             all_train_output.append(output)
             all_train_labels.append(secrets)
-            all_train_loss.append(loss.detach().cpu().numpy())
+            all_train_loss.append(loss.detach().numpy())
 
             do_log_eval = total_steps % updates_per_evaluation == 0
             do_log_train = total_steps % updates_per_train_log_commit == 0
-
-            print(do_log_train, do_log_eval)
+            total_steps += 1
 
             if do_log:
                 if do_log_train:
@@ -169,7 +146,7 @@ def main():
 
                             all_val_ouputs.append(val_output)
                             all_val_labels.append(val_labels)
-                            all_eval_losses.append(val_loss.detach().cpu().numpy())
+                            all_eval_losses.append(val_loss.detach().numpy())
 
                     log._log_values({'val_loss': np.array(loss).mean()}, step=total_steps, commit=True)
 
