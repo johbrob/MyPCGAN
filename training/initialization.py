@@ -15,10 +15,10 @@ dataset_to_name = {
 
 
 class TrainingConfig:
-    def __init__(self, lr=None, run_name='tmp', train_batch_size=128, test_batch_size=128, do_train_shuffle=True,
+    def __init__(self, run_name='tmp', train_batch_size=128, test_batch_size=128, do_train_shuffle=True,
                  do_test_shuffle=True, train_num_workers=2, test_num_workers=2, save_interval=5, checkpoint_interval=1,
                  updates_per_evaluation=50, updates_per_train_log_commit=10, gradient_accumulation=1, epochs=2,
-                 n_generated_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False, betas=None):
+                 n_generated_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False):
         self.run_name = run_name + '_' + self.random_id()
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
@@ -31,17 +31,6 @@ class TrainingConfig:
         self.updates_per_evaluation = updates_per_evaluation
         self.updates_per_train_log_commit = updates_per_train_log_commit
         self.gradient_accumulation = gradient_accumulation
-
-        if lr is None:
-            self.lr = {'filter_gen': 0.0001, 'filter_disc': 0.0004, 'secret_gen': 0.0001, 'secret_disc': 0.0004}
-        else:
-            self.lr = lr
-
-        if betas is None:
-            self.betas = {'filter_gen': (0.5, 0.999), 'filter_disc': (0.5, 0.999),
-                          'secret_gen': (0.5, 0.999), 'secret_disc': (0.5, 0.999)}
-        else:
-            self.betas = betas
 
         self.epochs = epochs
         self.n_generated_samples = n_generated_samples
@@ -69,8 +58,8 @@ def set_seed(seed: int = 42) -> None:
     # print(f"Random seed set as {seed}")
 
 
-def create_model_from_config(config):
-    return config.model(**vars(config.args))
+def create_architecture_from_config(config, device):
+    return config.architecture(config, device)
 
 
 def init_models(experiment_setup, device):
@@ -151,22 +140,19 @@ def init_training(dataset, experiment_setup, device):
         audio_mel_converter = CustomAudioMelConverter(experiment_setup.audio_mel)
     image_width, image_height = audio_mel_converter.output_shape(train_data[0][0])
 
-    experiment_setup.filter_gen.args.image_width = image_width
-    experiment_setup.filter_gen.args.image_height = image_height
-    experiment_setup.filter_gen.args.n_classes = train_data.n_genders
-    experiment_setup.filter_disc.args.n_classes = train_data.n_genders
-    experiment_setup.secret_gen.args.image_width = image_width
-    experiment_setup.secret_gen.args.image_height = image_height
-    experiment_setup.secret_gen.args.n_classes = train_data.n_genders
-    experiment_setup.secret_disc.args.n_classes = train_data.n_genders + 1
-    experiment_setup.label_classifier.args.n_classes = train_data.n_genders
-    experiment_setup.secret_classifier.args.n_classes = train_data.n_labels
+    if experiment_setup.training.deterministic:
+        set_seed(0)
 
-    loss_funcs, models, optimizers = init_models(experiment_setup, device)
+    experiment_setup.architecture.image_width = image_width
+    experiment_setup.architecture.image_height = image_height
+    experiment_setup.architecture.n_genders = train_data.n_genders
+    experiment_setup.architecture.n_labels = train_data.n_labels
+    # loss_funcs, models, optimizers = init_models(experiment_setup, device)
+    architecture = create_architecture_from_config(experiment_setup.architecture, device)
 
     if experiment_setup.training.do_log:
         log.init(utils.nestedConfigs2dict(experiment_setup), project=dataset_to_name[dataset],
                  run_name=experiment_setup.training.run_name)
 
-    training_loop(train_loader, test_loader, experiment_setup.training, models, optimizers, audio_mel_converter,
-                  loss_funcs, experiment_setup.loss, experiment_setup.audio_mel.sample_rate, device)
+    training_loop(train_loader, test_loader, experiment_setup.training, architecture, audio_mel_converter,
+                  experiment_setup.audio_mel.sample_rate, device)
