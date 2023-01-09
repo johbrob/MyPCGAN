@@ -15,8 +15,8 @@ class ModelConfig:
 
 Q = [
     ExperimentSetup(
-        training_config=TrainingConfig(run_name='BASE_All_ReLU', epochs=1000, train_batch_size=128,
-                                       test_batch_size=128, deterministic=True, gradient_accumulation=1,
+        training_config=TrainingConfig(run_name='BASE_entropy', epochs=1000, train_batch_size=128,
+                                       test_batch_size=128, deterministic=False, gradient_accumulation=1,
                                        save_interval=10, checkpoint_interval=10, updates_per_train_log_commit=10,
                                        updates_per_evaluation=50, do_log=True),
         audio_mel_config=AudioMelConfig(pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
@@ -28,26 +28,10 @@ Q = [
                                             pretrained_path=local_vars.CREMA_D_PRETRAINED_GENDER_CLASSIFIER_PATH),
         secret_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
                                              pretrained_path=local_vars.CREMA_D_PRETRAINED_EMOTION_CLASSIFIER_PATH),
-        loss_config=LossConfig()
+        loss_config=LossConfig(filter_entropy_loss=True)
     ),
     ExperimentSetup(
-        training_config=TrainingConfig(run_name='BASE_Disc_LeakyReLU', epochs=1000, train_batch_size=128,
-                                       test_batch_size=128, deterministic=True, gradient_accumulation=1,
-                                       save_interval=10, checkpoint_interval=10, updates_per_train_log_commit=10,
-                                       updates_per_evaluation=50, do_log=True),
-        audio_mel_config=AudioMelConfig(pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
-        filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
-        filter_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='leaky_relu')),
-        secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
-        secret_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='leaky_relu')),
-        label_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
-                                            pretrained_path=local_vars.CREMA_D_PRETRAINED_GENDER_CLASSIFIER_PATH),
-        secret_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
-                                             pretrained_path=local_vars.CREMA_D_PRETRAINED_EMOTION_CLASSIFIER_PATH),
-        loss_config=LossConfig()
-    ),
-    ExperimentSetup(
-        training_config=TrainingConfig(run_name='BASE_All_LeakyReLU', epochs=1000, train_batch_size=128,
+        training_config=TrainingConfig(run_name='BASE_All_LeakyReLU_entropy', epochs=1000, train_batch_size=128,
                                        test_batch_size=128, deterministic=True, gradient_accumulation=1,
                                        save_interval=10, checkpoint_interval=10, updates_per_train_log_commit=10,
                                        updates_per_evaluation=50, do_log=True),
@@ -60,7 +44,7 @@ Q = [
                                             pretrained_path=local_vars.CREMA_D_PRETRAINED_GENDER_CLASSIFIER_PATH),
         secret_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
                                              pretrained_path=local_vars.CREMA_D_PRETRAINED_EMOTION_CLASSIFIER_PATH),
-        loss_config=LossConfig()
+        loss_config=LossConfig(filter_entropy_loss=True)
     ),
     # ExperimentSetup(
     #     training_config=TrainingConfig(run_name='BASE_All_LeakyReLU_eps_1e-4', epochs=1000, train_batch_size=128,

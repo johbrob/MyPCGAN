@@ -2,7 +2,6 @@ from experiment_runs import AVAILABLE_RUNS
 from datasets import AvailableDatasets
 from training import init_training
 import argparse
-import configs
 import torch
 import tqdm
 
@@ -19,13 +18,6 @@ class WorkerConfig:
 AVAILABLE_DATASETS = {
     'audiomnist': AvailableDatasets.AudioMNIST,
     'cremad': AvailableDatasets.CremaD
-}
-
-available_settings = {
-    'debug': configs.create_debug_config(),
-    'github_default': configs.create_github_default_config(),
-    'github_lower_lr': configs.create_github_lower_lr_config(),
-    'deterministic': configs.create_deterministic_config()
 }
 
 
@@ -80,7 +72,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    # args = {'dataset': 'cremad', 'experiment': 'debug', 'gpus': [-1]}
+    args = {'dataset': 'cremad', 'experiment': 'tmp_new', 'gpus': [-1]}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpus'] == [-1]:

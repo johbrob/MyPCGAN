@@ -18,7 +18,7 @@ Q = [
         training_config=TrainingConfig(run_name='debug', epochs=2, train_batch_size=128,
                                        test_batch_size=128, deterministic=True, gradient_accumulation=1,
                                        save_interval=1, checkpoint_interval=1, updates_per_train_log_commit=10,
-                                       updates_per_evaluation=50, do_log=False),
+                                       updates_per_evaluation=1, do_log=False),
         audio_mel_config=AudioMelConfig(pretrained_path='neural_networks/pretrained_weights/best_netG_epoch_2120.pt'),
         filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
         filter_disc_config=ModelConfig(AlexNet, AlexNetConfig(activation='leaky_relu')),

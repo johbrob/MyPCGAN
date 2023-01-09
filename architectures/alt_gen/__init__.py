@@ -1,0 +1,1 @@
+from architectures.alt_gen.model import OneStepGAN, OneStepGanConfig
