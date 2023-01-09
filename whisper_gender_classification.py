@@ -71,15 +71,15 @@ def main():
     num_workers = 2
     sampling_rate = 16000
     epochs = 10
-    lr = 10e-4
+    lr = 10e-5
     do_log = True
     updates_per_evaluation = 20
-    updates_per_train_log_commit = 0
+    updates_per_train_log_commit = 1
     aggreagtion = Aggregation.AVERAGE
 
     settings = {'batch_size': batch_size, 'num_workers': num_workers, 'sampling_rate': sampling_rate, 'epochs': epochs,
                 'lr': lr, 'aggreagtion': aggreagtion.name, 'updates_per_evaluation': updates_per_evaluation,
-                updates_per_train_log_commit: updates_per_train_log_commit}
+                'updates_per_train_log_commit': updates_per_train_log_commit}
 
     if torch.cuda.is_available():
         device = 'cuda:0'
@@ -149,9 +149,11 @@ def main():
             do_log_eval = total_steps % updates_per_evaluation == 0
             do_log_train = total_steps % updates_per_train_log_commit == 0
 
+            print(do_log_train, do_log_eval)
+
             if do_log:
                 if do_log_train:
-                    log._log_values({'train_loss': all_train_loss}, step=total_steps, commit=True)
+                    log._log_values({'train_loss': np.array(all_train_loss).mean()}, step=total_steps, commit=True)
                     all_train_loss = []
 
                 if do_log_eval:
@@ -168,7 +170,7 @@ def main():
                         all_val_labels.append(val_labels)
                         all_eval_losses.append(val_loss)
 
-                    log._log_values({'val_loss': loss}, step=total_steps, commit=True)
+                    log._log_values({'val_loss': np.array(loss).mean()}, step=total_steps, commit=True)
 
 
 
