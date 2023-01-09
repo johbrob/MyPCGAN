@@ -129,8 +129,10 @@ def main():
             total_steps += 1
 
             if do_log:
+                metrics = {}
                 if do_log_train:
-                    log._log_values({'train_loss': np.array(all_train_loss).mean().item()}, step=total_steps, commit=True)
+                    metrics['train_loss'] = np.array(all_train_loss).mean().item()
+                    # log._log_values({'train_loss': np.array(all_train_loss).mean().item()}, step=total_steps, commit=False)
                     all_train_loss = []
 
                 if do_log_eval:
@@ -148,7 +150,9 @@ def main():
                             all_val_labels.append(val_labels)
                             all_val_losses.append(val_loss.detach().numpy())
 
-                    log._log_values({'val_loss': np.array(all_val_losses).mean().item()}, step=total_steps, commit=True)
+                    metrics['val_loss'] = np.array(all_val_losses).mean().item()
+                    # log._log_values({'val_loss': np.array(all_val_losses).mean().item()}, step=total_steps, commit=True)
+                log._log_values(metrics, step=total_steps, commit=True)
                     # log.metrics(np.array(all_val_losses), total_steps, prefix='val', commit=True)
 
 
