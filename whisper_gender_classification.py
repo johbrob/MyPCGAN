@@ -54,7 +54,7 @@ class BasicModel(torch.nn.Module):
         elif self.aggregation is Aggregation.LAST:
             return input_features[:, -1, :]
         elif self.aggregation is Aggregation.AVERAGE:
-            return input_features.mean(dim=1)
+            return torch.mean(input_features, dim=1)
         else:
             raise ValueError('Aggregation not recognized...')
 
@@ -134,4 +134,4 @@ def main():
             optimizer.step()
             optimizer.zero_grad()
 
-            log.metrics({'loss'}, total_steps, suffix='val', aggregation=np.mean, commit=False)
+            log.metrics({'loss': loss}, total_steps, suffix='val', aggregation=np.mean, commit=False)
