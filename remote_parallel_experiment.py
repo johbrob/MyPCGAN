@@ -21,12 +21,12 @@ AVAILABLE_DATASETS = {
     'cremad': AvailableDatasets.CremaD
 }
 
-available_settings = {
-    'debug': configs.create_debug_config(),
-    'github_default': configs.create_github_default_config(),
-    'github_lower_lr': configs.create_github_lower_lr_config(),
-    'deterministic': configs.create_deterministic_config()
-}
+# available_settings = {
+#     'debug': configs.create_debug_config(),
+#     'github_default': configs.create_github_default_config(),
+#     'github_lower_lr': configs.create_github_lower_lr_config(),
+#     'deterministic': configs.create_deterministic_config()
+# }
 
 
 def parallel_experiment_wrapper(queue, experiment_setting, dataset, device):
@@ -41,7 +41,18 @@ def parallel_experiment_wrapper(queue, experiment_setting, dataset, device):
     queue.put(device)
 
 
-def parallel_experiment_queue(queue, dataset, workers):
+def parallel_whisper_experiment_wrapper(queue, experiment_setting, dataset, device):
+    from whisper_gender_classification import main
+    print("--------------------------------------------------------------------")
+    print(f" Start whisper gender classification training on '{dataset.name}' dataset with '{str(experiment_setting)}' setting on {device}")
+    print("--------------------------------------------------------------------")
+    main(dataset=dataset, settings=experiment_setting, device=device)
+
+    print("Finishing experiment on device {}".format(device))
+    queue.put(device)
+
+
+def parallel_experiment_queue(experiment, queue, dataset, workers):
     print('Experiment queue has length', len(queue))
 
     import torch.multiprocessing as mp
@@ -55,7 +66,10 @@ def parallel_experiment_queue(queue, dataset, workers):
     processes = {}
     for experiment_setting in tqdm.tqdm(queue):
         device = messageQueue.get()
-        p = mp.Process(target=parallel_experiment_wrapper, args=(messageQueue, experiment_setting, dataset, device))
+        if experiment == 'whisper':
+            p = mp.Process(target=parallel_whisper_experiment_wrapper, args=(messageQueue, experiment_setting, dataset, device))
+        else:
+            p = mp.Process(target=parallel_experiment_wrapper, args=(messageQueue, experiment_setting, dataset, device))
         p.start()
         processes[device] = p
 
@@ -80,7 +94,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    # args = {'dataset': 'cremad', 'experiment': 'debug', 'gpus': [-1]}
+    args = {'dataset': 'cremad', 'experiment': 'whisper', 'gpus': [-1]}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpus'] == [-1]:
@@ -92,4 +106,4 @@ if __name__ == '__main__':
         print("Using GPU workers:", args['gpus'])
         workers = [WorkerConfig('cuda:{}'.format(i)) for i in args['gpus']]
 
-    parallel_experiment_queue(AVAILABLE_RUNS[args['experiment']], AVAILABLE_DATASETS[args['dataset']], workers)
+    parallel_experiment_queue(args['experiment'], AVAILABLE_RUNS[args['experiment']], AVAILABLE_DATASETS[args['dataset']], workers)

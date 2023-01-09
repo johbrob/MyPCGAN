@@ -1,6 +1,7 @@
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from datasets import CremaD
 from torch.utils.data import DataLoader
+from sklearn.metrics import accuracy_score
 from typing import Any, Dict, List, Union, Tuple
 import torch
 from dataclasses import dataclass
@@ -45,25 +46,24 @@ class BasicModel(torch.nn.Module):
         return self.linear2(x)
 
 
-def main():
-    batch_size = 16
-    num_workers = 2
-    sampling_rate = 16000
-    epochs = 10
-    lr = 10e-5
-    do_log = True
-    updates_per_evaluation = 20
-    updates_per_train_log_commit = 1
-    aggreagtion = Aggregation.AVERAGE
+def compute_accuracy(preds, labels):
 
-    settings = {'batch_size': batch_size, 'num_workers': num_workers, 'sampling_rate': sampling_rate, 'epochs': epochs,
-                'lr': lr, 'aggreagtion': aggreagtion.name, 'updates_per_evaluation': updates_per_evaluation,
-                'updates_per_train_log_commit': updates_per_train_log_commit}
+    preds = torch.stack(preds)
+    labels = torch.stack(labels)
+    preds = torch.argmax(preds, 1).cpu().numpy()
+    return np.array(accuracy_score(labels.cpu().numpy(), preds))
 
-    if torch.cuda.is_available():
-        device = 'cuda:0'
-    else:
-        device = 'cpu'
+def main(dataset=CremaD, settings=None, device=None):
+    if settings is None:
+        settings = {'batch_size': 16, 'num_workers': 2, 'sampling_rate': 16000, 'epochs': 10,
+                    'lr': 10e-5, 'aggreagtion': Aggregation.AVERAGE, 'updates_per_evaluation': 20,
+                    'updates_per_train_log_commit': 10, 'do_log': False}
+
+    if device is None:
+        if torch.cuda.is_available():
+            device = 'cuda:0'
+        else:
+            device = 'cpu'
 
     print('load whisper...')
     processor = AutoProcessor.from_pretrained("openai/whisper-small")
@@ -71,7 +71,7 @@ def main():
     whisper_encoder._freeze_parameters()
 
     embedding_dim = whisper_encoder.embed_positions.embedding_dim
-    model = BasicModel(embedding_dim, aggreagtion).to(device)
+    model = BasicModel(embedding_dim, settings['aggregation']).to(device)
 
     print('load data...')
     train_data, test_data = CremaD.load()
@@ -84,20 +84,22 @@ def main():
     print(f'Test set contains {test_data.n_speakers} speakers with {int(100 * test_female_speakar_ratio)}% '
           f'female speakers. Total size is {len(test_data.gender_idx)}\n')
 
-    train_loader = DataLoader(dataset=train_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
-    test_loader = DataLoader(dataset=test_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+    train_loader = DataLoader(dataset=train_data, batch_size=settings['batch_size'],
+                              num_workers=settings['num_workers'], shuffle=True)
+    test_loader = DataLoader(dataset=test_data, batch_size=settings['batch_size'], num_workers=settings['num_workers'],
+                             shuffle=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr)
+    optimizer = torch.optim.Adam(model.parameters(), settings['lr'])
     criterion = torch.nn.CrossEntropyLoss()
 
-    if do_log:
+    if settings['do_log']:
         log.init(settings, project='whisper_gender_classification',
-                 run_name=f'{aggreagtion.name}_bsz_{batch_size}_epochs_{epochs}_lr_{lr}')
+                 run_name=f"{settings['aggregation'].name}_bsz_{settings['batch_size']}_epochs_{settings['epochs']}_lr_{settings['lr']}")
 
     def get_whisper_embeddings(data):
         input_features = [audio.numpy() for audio in data]
         input_features = processor(input_features, return_tensors="pt",
-                                   sampling_rate=sampling_rate).input_features
+                                   sampling_rate=settings['sampling_rate']).input_features
         return whisper_encoder(input_features.to(device)).last_hidden_state
 
     model.train()
@@ -105,13 +107,16 @@ def main():
 
     total_steps = 0
 
-    for epoch in range(0, epochs):
+    for epoch in range(0, settings['epochs']):
         all_train_output = []
         all_train_labels = []
         all_train_loss = []
         for i, (data, secrets, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
-                                                          total=len(train_loader)):
+                                                     total=len(train_loader)):
 
+            if total_steps > 50:
+                break
+                
             embeddings = get_whisper_embeddings(data)
             output = model(embeddings)
 
@@ -124,37 +129,35 @@ def main():
             all_train_labels.append(secrets)
             all_train_loss.append(loss.detach().numpy())
 
-            do_log_eval = total_steps % updates_per_evaluation == 0
-            do_log_train = total_steps % updates_per_train_log_commit == 0
+            do_log_eval = total_steps % settings['updates_per_evaluation'] == 0
+            do_log_train = total_steps % settings['updates_per_train_log_commit'] == 0
             total_steps += 1
 
-            if do_log:
+            if settings['do_log']:
                 metrics = {}
                 if do_log_train:
                     metrics['train_loss'] = np.array(all_train_loss).mean().item()
-                    # log._log_values({'train_loss': np.array(all_train_loss).mean().item()}, step=total_steps, commit=False)
+                    metrics['train_acc'] = compute_accuracy(all_train_output, all_train_labels)
+
+
                     all_train_loss = []
 
                 if do_log_eval:
-                    all_val_ouputs = []
+                    all_val_outputs = []
                     all_val_labels = []
                     all_val_losses = []
                     with torch.no_grad():
-                        for i, (val_data, val_secrets, val_labels, _, _) in tqdm.tqdm(enumerate(test_loader), 'Validation',
-                                                                          total=len(test_loader)):
+                        for i, (val_data, val_secrets, val_labels, _, _) in tqdm.tqdm(enumerate(test_loader),
+                                                                                      'Validation',
+                                                                                      total=len(test_loader)):
                             val_embeddings = get_whisper_embeddings(val_data)
                             val_output = model(val_embeddings)
                             val_loss = criterion(val_output.cpu(), val_secrets)
 
-                            all_val_ouputs.append(val_output)
+                            all_val_outputs.append(val_output)
                             all_val_labels.append(val_labels)
                             all_val_losses.append(val_loss.detach().numpy())
 
                     metrics['val_loss'] = np.array(all_val_losses).mean().item()
-                    # log._log_values({'val_loss': np.array(all_val_losses).mean().item()}, step=total_steps, commit=True)
+                    metrics['val_acc'] = compute_accuracy(all_val_outputs, all_val_labels)
                 log._log_values(metrics, step=total_steps, commit=True)
-                    # log.metrics(np.array(all_val_losses), total_steps, prefix='val', commit=True)
-
-
-
-            # log.metrics({'loss': loss}, total_steps, suffix='val', aggregation=np.mean, commit=False)
