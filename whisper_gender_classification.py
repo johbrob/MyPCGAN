@@ -47,9 +47,12 @@ class BasicModel(torch.nn.Module):
 
 
 def compute_accuracy(preds, labels):
-
-    preds = torch.stack(preds)
-    labels = torch.stack(labels)
+    if len(preds) == 1:
+        preds = preds[0]
+    if len(labels) == 1:
+        labels = labels[1]
+    preds = torch.cat(preds, dim=0)
+    labels = torch.cat(labels, dim=0)
     preds = torch.argmax(preds, 1).cpu().numpy()
     return np.array(accuracy_score(labels.cpu().numpy(), preds))
 
@@ -105,7 +108,7 @@ def main(dataset=CremaD, settings=None, device=None):
     model.train()
     optimizer.zero_grad()
 
-    total_steps = 0
+    total_steps = 1
 
     for epoch in range(0, settings['epochs']):
         all_train_output = []
@@ -116,7 +119,7 @@ def main(dataset=CremaD, settings=None, device=None):
 
             if total_steps > 50:
                 break
-                
+
             embeddings = get_whisper_embeddings(data)
             output = model(embeddings)
 
@@ -139,7 +142,8 @@ def main(dataset=CremaD, settings=None, device=None):
                     metrics['train_loss'] = np.array(all_train_loss).mean().item()
                     metrics['train_acc'] = compute_accuracy(all_train_output, all_train_labels)
 
-
+                    all_train_output = []
+                    all_train_labels = []
                     all_train_loss = []
 
                 if do_log_eval:
