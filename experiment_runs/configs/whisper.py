@@ -9,11 +9,11 @@ class ModelConfig:
 
 Q = [{'batch_size': 16, 'num_workers': 2, 'sampling_rate': 16000, 'epochs': 10,
                 'lr': 10e-5, 'aggregation': Aggregation.AVERAGE, 'updates_per_evaluation': 20,
-                'updates_per_train_log_commit': 1, 'do_log': True},
+                'updates_per_train_log_commit': 10, 'do_log': True},
      {'batch_size': 16, 'num_workers': 2, 'sampling_rate': 16000, 'epochs': 10,
                 'lr': 10e-5, 'aggregation': Aggregation.FIRST, 'updates_per_evaluation': 20,
-                'updates_per_train_log_commit': 1, 'do_log': True},
+                'updates_per_train_log_commit': 10, 'do_log': True},
     {'batch_size': 16, 'num_workers': 2, 'sampling_rate': 16000, 'epochs': 10,
                 'lr': 10e-5, 'aggregation': Aggregation.LAST, 'updates_per_evaluation': 20,
-                'updates_per_train_log_commit': 1, 'do_log': True},
+                'updates_per_train_log_commit': 10, 'do_log': True},
 ]
