@@ -108,8 +108,6 @@ def save_sample(save_dir, id, label, epoch, pred_label_male, pred_label_female, 
     save_audio_file(female_audio_file, sampling_rate, audio_female.squeeze().detach().cpu())
     save_audio_file(original_audio_file, sampling_rate, original_audio.squeeze().detach().cpu())
 
-
-
 # ----------- Path related stuff -----------
 
 

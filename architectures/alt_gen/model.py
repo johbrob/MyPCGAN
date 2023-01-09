@@ -4,6 +4,7 @@ from architectures.alt_gen import loss_compiling
 from utils import Mode
 import torch
 import tqdm
+import os
 
 
 class OneStepGanConfig:
@@ -117,7 +118,6 @@ class OneStepGAN:
 
         return batch_metrics, losses
 
-
     def set_mode(self, mode):
         if mode == Mode.TRAIN:
             self.gen.train()
@@ -128,67 +128,55 @@ class OneStepGAN:
             self.fake_disc.eval()
             self.secret_disc.eval()
 
-    def save_test_samples(self, example_dir, data_loader, audio_mel_converter, models, loss_func, epoch, sampling_rate,
-                          device,
-                          n_samples_generated):
-        self.set_mode(Mode.EVAL)
-        noise_dim = models['filter_gen'].noise_dim
-        models['filter_gen'].to(device)
+    def generate_sample(self, audio, id, label, secret, mels, stds, means, audio_mel_converter, epoch, sampling_rate,
+                        save_dir, device):
 
-        with torch.no_grad():
-            for i, (data, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples',
-                                                             total=len(data_loader)):
+        speaker_str = f'speaker_{id.item()}_label_{label.item()}_secret_{secret.item()}'
+        speaker_epoch_str = speaker_str + f'_epoch_{epoch}'
+        build_str = lambda secret, digit: speaker_epoch_str + f'_sampled_secret_{secret}_predicted_secret_{label}.wav'
 
-                if i >= n_samples_generated:
-                    break
-                # data: (1 x seq_len), secret: (1,), label: (1,), id: (1,)
-                data, secret, label, id = data[:1], secret[:1], label[:1], id[:1]
+        # original audio
+        original_audio_file = os.path.join(save_dir, speaker_str + '.wav')
 
-                label, secret = label.to(device), secret.to(device)
-                original_mel = audio_mel_converter.audio2mel(data).detach()
-                mel, means, stds = preprocess_spectrograms(original_mel)
-                mel = mel.unsqueeze(dim=1).to(device)
+        # audio passed through the pipeline, converted to mel and then back (a2m2a = audio2mel2audio)
+        fake_a2m2a_pred = torch.argmax(self.fake_disc(mels), 1).detach().cpu().numpy().item()
+        secret_a2m2a_pred = torch.argmax(self.secret_disc(mels), 1).detach().cpu().numpy().item()
+        a2m2a_mels = torch.squeeze(mels.to(device) * 3 * stds.to(device) + means.to(device))
+        audio2mel2audio = audio_mel_converter.mel2audio(a2m2a_mels.squeeze().detach().cpu())
+        audio2mel2audio_file = os.path.join(
+            save_dir, speaker_str + f'_converted_fake_pred_{fake_a2m2a_pred}_secret_pred_{secret_a2m2a_pred}.wav')
+
+        # audio generated conditioned on a specific secret
+        z = torch.randn(mels.shape[0], self.gen.noise_dim).to(mels.device)
+
+        # female
+        fake_secret_zero = torch.zeros(mels.shape[0:1]).to(device)
+        fake_mels_zero = self.gen(mels, z, fake_secret_zero)  # (bsz, 1, n_mels, frames)
+        unnormalized_zero = (torch.squeeze(fake_mels_zero, 1) * 3 * stds + means).to(device)
+        fake_zero_audio = audio_mel_converter.mel2audio(unnormalized_zero.squeeze().detach().cpu())
+        fake_pred = torch.argmax(self.fake_disc(mels), 1).detach().cpu().numpy().item()
+        secret_pred = torch.argmax(self.secret_disc(mels), 1).detach().cpu().numpy().item()
+
+        # male
+        fake_secret_one = torch.ones(mels.shape[0:1]).to(device)
+        fake_mels_one = self.gen(mels, z, fake_secret_one)  # (bsz, 1, n_mels, frames)
+        unnormalized_one = (torch.squeeze(fake_mels_one, 1) * 3 * stds + means).to(device)
+        fake_one_audio = audio_mel_converter.mel2audio(unnormalized_one.squeeze().detach().cpu())
+
+        build_str = lambda secret,
+                           digit: speaker_digit_epoch_str + f'_sampled_secret_{secret}_predicted_secret_{label}.wav'
 
 
-                # filter_gen
-                filter_z = torch.randn(mel.shape[0], noise_dim).to(device)
-                filtered = models['filter_gen'](mel, filter_z, secret.long()).detach()
+filtered_audio_file = os.path.join(save_dir, speaker_digit_epoch_str + '_filtered.wav')
+male_audio_file = os.path.join(save_dir, build_str('male', pred_label_male.item()))
+female_audio_file = os.path.join(save_dir, build_str('female', pred_label_female.item()))
 
-                # predict label
-                pred_label_male = torch.argmax(models['label_classifier'](fake_mel_male).data, 1)
-                pred_label_female = torch.argmax(models['label_classifier'](fake_mel_female).data, 1)
+save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.squeeze().detach().cpu())
+save_audio_file(male_audio_file, sampling_rate, audio_male.squeeze().detach().cpu())
+save_audio_file(female_audio_file, sampling_rate, audio_female.squeeze().detach().cpu())
+save_audio_file(original_audio_file, sampling_rate, original_audio.squeeze().detach().cpu())
 
-                # predict secret
-                pred_secret_male = torch.argmax(models['secret_classifier'](fake_mel_male).data, 1)
-                pred_secret_female = torch.argmax(models['secret_classifier'](fake_mel_female).data, 1)
-
-                # distortions
-                filtered_distortion = loss_func['secret_gen_distortion'](mel, filtered).item()
-                male_distortion = loss_func['secret_gen_distortion'](mel, fake_mel_male).item()
-                female_distortion = loss_func['secret_gen_distortion'](mel, fake_mel_female).item()
-                sample_distortion = loss_func['secret_gen_distortion'](fake_mel_male, fake_mel_female).item()
-
-                unnormalized_filtered_mel = torch.squeeze(filtered, 1).to(device) * 3 * stds.to(device) + means.to(
-                    device)
-                unnormalized_fake_mel_male = torch.squeeze(fake_mel_male, 1).to(device) * 3 * stds.to(
-                    device) + means.to(device)
-                unnormalized_fake_mel_female = torch.squeeze(fake_mel_female, 1).to(device) * 3 * stds.to(
-                    device) + means.to(
-                    device)
-                unnormalized_spectrograms = torch.squeeze(mel.to(device) * 3 * stds.to(device) + means.to(device))
-
-                # TODO: These could be on gpu if we use MelGAnGenerator
-                filtered_audio = audio_mel_converter.mel2audio(unnormalized_filtered_mel.squeeze().detach().cpu())
-                audio_male = audio_mel_converter.mel2audio(unnormalized_fake_mel_male.squeeze().detach().cpu())
-                audio_female = audio_mel_converter.mel2audio(unnormalized_fake_mel_female.squeeze().detach().cpu())
-
-                utils.save_sample(utils.create_subdir(example_dir, 'audio'), id, label, epoch, pred_label_male,
-                                  pred_label_female, filtered_audio, audio_male, audio_female, data.squeeze(),
-                                  sampling_rate)
-
-                comparison_plot_pcgan(original_mel, unnormalized_filtered_mel, unnormalized_fake_mel_male,
-                                      unnormalized_fake_mel_female, secret, label, pred_secret_male, pred_secret_female,
-                                      pred_label_male, pred_label_female, male_distortion, female_distortion,
-                                      sample_distortion,
-                                      utils.create_subdir(example_dir, 'spectrograms'), epoch, id)
-        print("Success!")
+return {original_audio_file: audio.squeeze().detach().cpu(),
+        audio2mel2audio_file: audio2mel2audio,
+        fake_secret_zero_files: fake_secret_zero_files,
+        fake_secret_one_file: fake_secret_one_audio}
