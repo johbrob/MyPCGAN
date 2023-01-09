@@ -151,7 +151,7 @@ def main(dataset=CremaD, settings=None, device=None):
                     all_val_labels = []
                     all_val_losses = []
                     with torch.no_grad():
-                        for i, (val_data, val_secrets, val_labels, _, _) in tqdm.tqdm(enumerate(test_loader),
+                        for i, (val_data, val_secrets, _, _, _) in tqdm.tqdm(enumerate(test_loader),
                                                                                       'Validation',
                                                                                       total=len(test_loader)):
                             val_embeddings = get_whisper_embeddings(val_data)
@@ -159,7 +159,7 @@ def main(dataset=CremaD, settings=None, device=None):
                             val_loss = criterion(val_output.cpu(), val_secrets)
 
                             all_val_outputs.append(val_output)
-                            all_val_labels.append(val_labels)
+                            all_val_labels.append(val_secrets)
                             all_val_losses.append(val_loss.detach().numpy())
 
                     metrics['val_loss'] = np.array(all_val_losses).mean().item()
