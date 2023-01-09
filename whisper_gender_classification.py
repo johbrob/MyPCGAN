@@ -67,15 +67,19 @@ class BasicModel(torch.nn.Module):
 
 
 def main():
-    batch_size = 8
+    batch_size = 16
     num_workers = 2
     sampling_rate = 16000
     epochs = 10
     lr = 10e-4
     do_log = True
+    updates_per_evaluation = 20
+    updates_per_train_log_commit = 0
     aggreagtion = Aggregation.AVERAGE
+
     settings = {'batch_size': batch_size, 'num_workers': num_workers, 'sampling_rate': sampling_rate, 'epochs': epochs,
-                'lr': lr, 'aggreagtion': aggreagtion.name}
+                'lr': lr, 'aggreagtion': aggreagtion.name, 'updates_per_evaluation': updates_per_evaluation,
+                updates_per_train_log_commit: updates_per_train_log_commit}
 
     if torch.cuda.is_available():
         device = 'cuda:0'
@@ -85,6 +89,7 @@ def main():
     print('load whisper...')
     processor = AutoProcessor.from_pretrained("openai/whisper-small")
     whisper_encoder = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-small").get_encoder().to(device)
+    whisper_encoder._freeze_parameters()
 
     embedding_dim = whisper_encoder.embed_positions.embedding_dim
     model = BasicModel(embedding_dim, aggreagtion).to(device)
@@ -124,7 +129,10 @@ def main():
     total_steps = 0
 
     for epoch in range(0, epochs):
-        for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epochs),
+        all_train_output = []
+        all_train_labels = []
+        all_train_loss = []
+        for i, (data, secrets, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epochs),
                                                           total=len(train_loader)):
             embeddings = get_whisper_embeddings(data)
             output = model(embeddings)
@@ -133,5 +141,35 @@ def main():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            log._log_values({'loss_train': loss}, step=total_steps, commit=True)
+
+            all_train_output.append(output)
+            all_train_labels.append(secrets)
+            all_train_loss.append(loss)
+
+            do_log_eval = total_steps % updates_per_evaluation == 0
+            do_log_train = total_steps % updates_per_train_log_commit == 0
+
+            if do_log:
+                if do_log_train:
+                    log._log_values({'train_loss': all_train_loss}, step=total_steps, commit=True)
+                    all_train_loss = []
+
+                if do_log_eval:
+                    all_val_ouputs = []
+                    all_val_labels = []
+                    all_eval_losses = []
+                    for i, (val_data, val_secrets, val_labels, _, _) in tqdm.tqdm(enumerate(test_loader), 'Validation',
+                                                                      total=len(test_loader)):
+                        val_embeddings = get_whisper_embeddings(val_data)
+                        val_output = model(val_embeddings)
+                        val_loss = criterion(val_output.cpu(), val_secrets)
+
+                        all_val_ouputs.append(val_output)
+                        all_val_labels.append(val_labels)
+                        all_eval_losses.append(val_loss)
+
+                    log._log_values({'val_loss': loss}, step=total_steps, commit=True)
+
+
+
             # log.metrics({'loss': loss}, total_steps, suffix='val', aggregation=np.mean, commit=False)
