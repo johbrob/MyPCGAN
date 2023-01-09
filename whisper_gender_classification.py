@@ -109,7 +109,7 @@ def main():
         all_train_output = []
         all_train_labels = []
         all_train_loss = []
-        for i, (data, secrets, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epochs),
+        for i, (data, secrets, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                           total=len(train_loader)):
 
             embeddings = get_whisper_embeddings(data)
@@ -130,13 +130,13 @@ def main():
 
             if do_log:
                 if do_log_train:
-                    log._log_values({'train_loss': np.array(all_train_loss).mean()}, step=total_steps, commit=True)
+                    log._log_values({'train_loss': np.array(all_train_loss).mean().item()}, step=total_steps, commit=True)
                     all_train_loss = []
 
                 if do_log_eval:
                     all_val_ouputs = []
                     all_val_labels = []
-                    all_eval_losses = []
+                    all_val_losses = []
                     with torch.no_grad():
                         for i, (val_data, val_secrets, val_labels, _, _) in tqdm.tqdm(enumerate(test_loader), 'Validation',
                                                                           total=len(test_loader)):
@@ -146,9 +146,10 @@ def main():
 
                             all_val_ouputs.append(val_output)
                             all_val_labels.append(val_labels)
-                            all_eval_losses.append(val_loss.detach().numpy())
+                            all_val_losses.append(val_loss.detach().numpy())
 
-                    log._log_values({'val_loss': np.array(loss).mean()}, step=total_steps, commit=True)
+                    log._log_values({'val_loss': np.array(all_val_losses).mean().item()}, step=total_steps, commit=True)
+                    # log.metrics(np.array(all_val_losses), total_steps, prefix='val', commit=True)
 
 
 
