@@ -109,7 +109,7 @@ def main():
     criterion = torch.nn.CrossEntropyLoss()
 
     if do_log:
-        log.init(settings, project=['whisper_gender_classification'],
+        log.init(settings, project='whisper_gender_classification',
                  run_name=f'{aggreagtion.name}_bsz_{batch_size}_epochs_{epochs}_lr_{lr}')
 
     def get_whisper_embeddings(data):
