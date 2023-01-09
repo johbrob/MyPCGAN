@@ -144,7 +144,7 @@ def main():
 
             all_train_output.append(output)
             all_train_labels.append(secrets)
-            all_train_loss.append(loss)
+            all_train_loss.append(loss.cpu().numpy())
 
             do_log_eval = total_steps % updates_per_evaluation == 0
             do_log_train = total_steps % updates_per_train_log_commit == 0
@@ -168,7 +168,7 @@ def main():
 
                         all_val_ouputs.append(val_output)
                         all_val_labels.append(val_labels)
-                        all_eval_losses.append(val_loss)
+                        all_eval_losses.append(val_loss.cpu().numpy())
 
                     log._log_values({'val_loss': np.array(loss).mean()}, step=total_steps, commit=True)
 
