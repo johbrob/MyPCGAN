@@ -117,9 +117,6 @@ def main(dataset=CremaD, settings=None, device=None):
         for i, (data, secrets, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                      total=len(train_loader)):
 
-            if total_steps > 50:
-                break
-
             embeddings = get_whisper_embeddings(data)
             output = model(embeddings)
 
