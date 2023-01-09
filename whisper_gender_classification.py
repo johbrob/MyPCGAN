@@ -114,9 +114,9 @@ def main():
 
     def get_whisper_embeddings(data):
         input_features = [audio.numpy() for audio in data]
-        input_features = processor(input_features.to(device), return_tensors="pt",
+        input_features = processor(input_features, return_tensors="pt",
                                    sampling_rate=sampling_rate).input_features
-        return whisper_encoder(input_features).last_hidden_state
+        return whisper_encoder(input_features.to(device)).last_hidden_state
 
     model.train()
     optimizer.zero_grad()
