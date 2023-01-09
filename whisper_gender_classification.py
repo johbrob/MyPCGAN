@@ -47,14 +47,12 @@ class BasicModel(torch.nn.Module):
 
 
 def compute_accuracy(preds, labels):
-    print(len(preds), len(labels))
     if len(preds) == 1:
         preds = preds[0]
         labels = labels[0]
     else:
         preds = torch.cat(preds, dim=0)
         labels = torch.cat(labels, dim=0)
-    print(len(preds))
     preds = torch.argmax(preds, 1).cpu().numpy()
     return np.array(accuracy_score(labels.cpu().numpy(), preds))
 
@@ -137,9 +135,6 @@ def main(dataset=CremaD, settings=None, device=None):
             do_log_eval = total_steps % settings['updates_per_evaluation'] == 0
             do_log_train = total_steps % settings['updates_per_train_log_commit'] == 0
             total_steps += 1
-
-            print(settings['updates_per_evaluation'], total_steps % settings['updates_per_evaluation'], total_steps % settings['updates_per_evaluation'] == 0)
-            print(settings['updates_per_train_log_commit'], total_steps % settings['updates_per_train_log_commit'], total_steps % settings['updates_per_train_log_commit'] == 0)
 
             if settings['do_log']:
                 metrics = {}
