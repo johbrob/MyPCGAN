@@ -133,5 +133,5 @@ def main():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-
-            log.metrics({'loss': loss}, total_steps, suffix='val', aggregation=np.mean, commit=False)
+            log._log_values({'loss_train': loss}, step=total_steps, commit=True)
+            # log.metrics({'loss': loss}, total_steps, suffix='val', aggregation=np.mean, commit=False)
