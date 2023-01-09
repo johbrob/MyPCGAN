@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 import tqdm
 import enum
+import log
+
 
 @dataclass
 class DataCollatorSpeechClassification:
@@ -28,10 +30,12 @@ class DataCollatorSpeechClassification:
         # batch['labels'] = data[1]
         # return batch
 
+
 class Aggregation(enum.Enum):
     FIRST = 0
     LAST = 1
     AVERAGE = 2
+
 
 class BasicModel(torch.nn.Module):
 
@@ -66,20 +70,24 @@ def main():
     batch_size = 8
     num_workers = 2
     sampling_rate = 16000
-    epoch = 10
+    epochs = 10
     lr = 10e-4
+    do_log = True
+    aggreagtion = Aggregation.AVERAGE
+    settings = {'batch_size': batch_size, 'num_workers': num_workers, 'sampling_rate': sampling_rate, 'epochs': epochs,
+                'lr': lr, 'aggreagtion': aggreagtion.name}
 
     if torch.cuda.is_available():
-        device = torch.device = '0'
+        device = 'cuda:0'
     else:
-        device = torch.device = 'cpu'
+        device = 'cpu'
 
     print('load whisper...')
-    processor = AutoProcessor.from_pretrained("openai/whisper-small").to(device)
+    processor = AutoProcessor.from_pretrained("openai/whisper-small")
     whisper_encoder = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-small").get_encoder().to(device)
 
     embedding_dim = whisper_encoder.embed_positions.embedding_dim
-    model = BasicModel(embedding_dim, Aggregation.AVERAGE).to(device)
+    model = BasicModel(embedding_dim, aggreagtion).to(device)
 
     # print(model.get_encoder())
 
@@ -100,28 +108,30 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr)
     criterion = torch.nn.CrossEntropyLoss()
 
+    if do_log:
+        log.init(settings, project=['whisper_gender_classification'],
+                 run_name=f'{aggreagtion.name}_bsz_{batch_size}_epochs_{epochs}_lr_{lr}')
+
     def get_whisper_embeddings(data):
         input_features = [audio.numpy() for audio in data]
-        input_features = processor(input_features, return_tensors="pt", sampling_rate=sampling_rate).input_features
+        input_features = processor(input_features.to(device), return_tensors="pt",
+                                   sampling_rate=sampling_rate).input_features
         return whisper_encoder(input_features).last_hidden_state
 
     model.train()
     optimizer.zero_grad()
 
-    for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
-                                                      total=len(train_loader)):
-        data = data.to(device)
-        embeddings = get_whisper_embeddings(data)
-        output = model(embeddings)
+    total_steps = 0
 
-        loss = criterion(output.cpu(), secrets)
-        loss.backward()
-        optimizer.step()
+    for epoch in range(0, epochs):
+        for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epochs),
+                                                          total=len(train_loader)):
+            embeddings = get_whisper_embeddings(data)
+            output = model(embeddings)
 
-        print(loss)
+            loss = criterion(output.cpu(), secrets)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
-
-
-
-
-
+            log.metrics({'loss'}, total_steps, suffix='val', aggregation=np.mean, commit=False)
