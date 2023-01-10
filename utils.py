@@ -1,5 +1,6 @@
 from pathlib import Path
 from enum import Enum
+import numpy as np
 import local_vars
 import scipy.io
 import torch
@@ -7,6 +8,7 @@ import glob
 import os
 
 # ----------- Torch model related stuff -----------
+
 
 class Mode(Enum):
     TRAIN = 0
@@ -82,6 +84,8 @@ def unfreeze(model):
 
 
 def save_audio_file(file_path, sampling_rate, audio):
+    print(file_path, audio.shape)
+
     if isinstance(file_path, str):
         file_path = Path(file_path)
     elif not isinstance(file_path, Path):
@@ -147,6 +151,27 @@ def has_gradients(model, model_name):
     else:
         print(f'{model_name} has gradients and largest is {max_abs_grad}')
 
+# ------------ Metrics --------------------------------
+
+
+def compile_metrics(metrics):
+    metrics = {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric
+               in metric_dict.items()}
+    return metrics
+
+
+def aggregate_metrics(batch_metrics, metrics):
+    for k, v in batch_metrics.items():
+        if k not in metrics:
+            metrics[k] = []
+        if isinstance(v, np.ndarray):
+            metrics[k].append(v.item())
+        elif isinstance(v, int) or isinstance(v, float) or isinstance(v, np.float32) or isinstance(v, np.float64):
+            metrics[k].append(v)
+        else:
+            raise NotImplementedError(f'Unexpected format of metric: {k}, {v}')
+
+    return metrics
 
 
 

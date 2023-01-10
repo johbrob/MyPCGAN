@@ -17,7 +17,7 @@ class HLoss(torch.nn.Module):
         return b
 
 
-class PCGANConfig:
+class WhistperPcganConfig:
     def __init__(self, filter_gen_config, filter_disc_config, secret_gen_config, secret_disc_config,
                  label_classifier_config, secret_classifier_config, lr=None, betas=None, generate_both_secrets=True,
                  filter_gen_label_smoothing=0, secret_gen_label_smoothing=0,
@@ -53,7 +53,7 @@ class PCGANConfig:
         self.loss = loss_config
 
 
-class PCGAN:
+class WhisperPcgan:
     def __init__(self, config, device):
 
         config.filter_gen.args.image_width = config.image_width
@@ -84,6 +84,7 @@ class PCGAN:
         self.secret_disc = create_model_from_config(config.secret_disc).to(device)
         self.label_classifier = create_model_from_config(config.label_classifier).to(device)
         self.secret_classifier = create_model_from_config(config.secret_classifier).to(device)
+        self.whisper_encoder
 
         if config.label_classifier.pretrained_path:
             self.label_classifier.model.load_state_dict(

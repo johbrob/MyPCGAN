@@ -95,23 +95,3 @@ def compute_metrics(mels, secret, label, filter_gen_output, filter_disc_output, 
     return {'filter_gen': filter_gen_metrics, 'secret_gen': secret_gen_metrics,
             'filter_disc': filter_disc_metrics, 'secret_disc': secret_disc_metrics,
             'label_classifier': label_prediction_metrics, 'secret_classifier': secret_prediction_metrics}
-
-
-def compile_metrics(metrics):
-    metrics = {group_name + '/' + name: metric for group_name, metric_dict in metrics.items() for name, metric
-               in metric_dict.items()}
-    return metrics
-
-
-def aggregate_metrics(batch_metrics, metrics):
-    for k, v in batch_metrics.items():
-        if k not in metrics:
-            metrics[k] = []
-        if isinstance(v, np.ndarray):
-            metrics[k].append(v.item())
-        elif isinstance(v, int) or isinstance(v, float) or isinstance(v, np.float32) or isinstance(v, np.float64):
-            metrics[k].append(v)
-        else:
-            raise NotImplementedError(f'Unexpected format of metric: {k}, {v}')
-
-    return metrics

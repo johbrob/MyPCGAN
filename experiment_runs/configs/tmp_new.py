@@ -1,6 +1,4 @@
-import local_vars
 from experiment_runs import ExperimentSetup
-from loss_compiling import LossConfig
 from neural_networks import AvailableModels, UNet, UNetConfig, AlexNet, AlexNetConfig, ResNet18, ResNetConfig
 from neural_networks.audio_mel import AudioMelConfig
 from training.initialization import TrainingConfig

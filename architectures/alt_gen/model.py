@@ -105,7 +105,7 @@ class OneStepGAN:
         return {'fake_secret_score': fake_secret_score, 'real_secret_score': real_secret_score,
                 'alt_fake_secret_score': alt_fake_secret_score}
 
-    def forward_pass(self, mels, secrets):
+    def forward_pass(self, mels, secrets, labels):
         assert mels.dim() == 4
 
         gen_output = self._gen_forward_pass(mels)
@@ -163,20 +163,17 @@ class OneStepGAN:
         unnormalized_one = (torch.squeeze(fake_mels_one, 1) * 3 * stds + means).to(device)
         fake_one_audio = audio_mel_converter.mel2audio(unnormalized_one.squeeze().detach().cpu())
 
-        build_str = lambda secret,
-                           digit: speaker_digit_epoch_str + f'_sampled_secret_{secret}_predicted_secret_{label}.wav'
 
+        filtered_audio_file = os.path.join(save_dir, speaker_digit_epoch_str + '_filtered.wav')
+        male_audio_file = os.path.join(save_dir, build_str('male', pred_label_male.item()))
+        female_audio_file = os.path.join(save_dir, build_str('female', pred_label_female.item()))
 
-filtered_audio_file = os.path.join(save_dir, speaker_digit_epoch_str + '_filtered.wav')
-male_audio_file = os.path.join(save_dir, build_str('male', pred_label_male.item()))
-female_audio_file = os.path.join(save_dir, build_str('female', pred_label_female.item()))
+        save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.squeeze().detach().cpu())
+        save_audio_file(male_audio_file, sampling_rate, audio_male.squeeze().detach().cpu())
+        save_audio_file(female_audio_file, sampling_rate, audio_female.squeeze().detach().cpu())
+        save_audio_file(original_audio_file, sampling_rate, original_audio.squeeze().detach().cpu())
 
-save_audio_file(filtered_audio_file, sampling_rate, filtered_audio.squeeze().detach().cpu())
-save_audio_file(male_audio_file, sampling_rate, audio_male.squeeze().detach().cpu())
-save_audio_file(female_audio_file, sampling_rate, audio_female.squeeze().detach().cpu())
-save_audio_file(original_audio_file, sampling_rate, original_audio.squeeze().detach().cpu())
-
-return {original_audio_file: audio.squeeze().detach().cpu(),
-        audio2mel2audio_file: audio2mel2audio,
-        fake_secret_zero_files: fake_secret_zero_files,
-        fake_secret_one_file: fake_secret_one_audio}
+        return {original_audio_file: audio.squeeze().detach().cpu(),
+                audio2mel2audio_file: audio2mel2audio,
+                fake_secret_zero_files: fake_secret_zero_files,
+                fake_secret_one_file: fake_secret_one_audio}

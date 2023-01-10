@@ -1,12 +1,12 @@
-from metrics_compiling import compile_metrics, aggregate_metrics
 from training.utils import preprocess_spectrograms
-from training.sampling import save_test_samples, generate_samples
+# from training.sampling import save_test_samples, generate_samples
 import numpy as np
 import torch
 import utils
 import tqdm
 import time
 import log
+import os
 
 
 def training_loop(train_loader, test_loader, training_config, architecture, audio_mel_converter, sample_rate, device):
@@ -16,7 +16,6 @@ def training_loop(train_loader, test_loader, training_config, architecture, audi
         epoch = epoch + 1
         epoch_start = time.time()
 
-        # utils.set_mode(architecture.models, utils.Mode.TRAIN)
         architecture.set_mode(utils.Mode.TRAIN)
         step_counter = 0
         metrics = {}
@@ -31,9 +30,9 @@ def training_loop(train_loader, test_loader, training_config, architecture, audi
             mels, means, stds = preprocess_spectrograms(mels)
             mels = mels.unsqueeze(dim=1).to(device)  # mels: (bsz, 1, n_mels, frames)
 
-            batch_metrics, losses = architecture.forward_pass(mels, secrets)
-            batch_metrics = compile_metrics(batch_metrics)
-            metrics = aggregate_metrics(batch_metrics, metrics)
+            batch_metrics, losses = architecture.forward_pass(mels, secrets, labels)
+            batch_metrics = utils.compile_metrics(batch_metrics)
+            metrics = utils.aggregate_metrics(batch_metrics, metrics)
 
             do_log_eval = total_steps % training_config.updates_per_evaluation == 0
             do_log_train = total_steps % training_config.updates_per_train_log_commit == 0
@@ -52,10 +51,9 @@ def training_loop(train_loader, test_loader, training_config, architecture, audi
 
         if epoch % training_config.save_interval == 0:
             print("Saving data and mels samples.")
-            save_test_samples(
-                utils.create_run_subdir(train_loader.dataset.get_name(), training_config.run_name, 'samples'),
-                test_loader, audio_mel_converter, architecture, epoch, sample_rate, device,
-                training_config.n_generated_samples)
+            save_samples(utils.create_run_subdir(test_loader.dataset.get_name(), training_config.run_name, 'samples'),
+                         test_loader, audio_mel_converter, architecture, epoch, sample_rate, device,
+                         training_config.n_samples)
 
         if epoch % training_config.checkpoint_interval == 0:
             utils.save_models_and_optimizers(
@@ -63,8 +61,8 @@ def training_loop(train_loader, test_loader, training_config, architecture, audi
                 epoch, architecture)
 
 
-def evaluate_on_dataset(data_loader, audio_mel_converter, architecture, generate_both_genders, device):
-    utils.set_mode(architecture.models, utils.Mode.EVAL)
+def evaluate_on_dataset(data_loader, audio_mel_converter, architecture, device):
+    architecture.set_mode(utils.Mode.EVAL)
 
     metrics = {}
 
@@ -76,8 +74,31 @@ def evaluate_on_dataset(data_loader, audio_mel_converter, architecture, generate
             mels, means, stds = preprocess_spectrograms(mels)
             mels = mels.unsqueeze(dim=1).to(device)  # spectrogram: (bsz, 1, n_mels, frames)
 
-            batch_metrics, losses = architecture.forward_pass(mels, secrets, generate_both_genders)
-            batch_metrics = compile_metrics(batch_metrics)
-            metrics = aggregate_metrics(batch_metrics, metrics)
+            batch_metrics, losses = architecture.forward_pass(mels, secrets, labels)
+            batch_metrics = utils.compile_metrics(batch_metrics)
+            metrics = utils.aggregate_metrics(batch_metrics, metrics)
 
+    architecture.set_mode(utils.Mode.TRAIN)
     return metrics
+
+
+def save_samples(example_dir, data_loader, audio_mel_converter, architecture, epoch, sampling_rate, device, n_samples):
+    architecture.set_mode(utils.Mode.EVAL)
+    save_dir = utils.create_subdir(example_dir, 'audio')
+
+    with torch.no_grad():
+        for i, (data, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples',
+                                                         total=len(data_loader)):
+            if i >= n_samples:
+                break
+
+            data, secret, label, id = data[:1], secret[:1], label[:1], id[:1]
+            # data: (1 x seq_len), secret: (1,), label: (1,), id: (1,)
+
+            label, secret = label.to(device), secret.to(device)
+            original_mel = audio_mel_converter.audio2mel(data).detach()
+            mel, mean, std = preprocess_spectrograms(original_mel)
+            mel = mel.unsqueeze(dim=1).to(device)
+
+            sample = architecture.generate_sample(data, mel, std, mean, secret, label, id, audio_mel_converter, epoch)
+            [utils.save_audio_file(os.path.join(save_dir, k), sampling_rate, v) for k, v in sample.items()]

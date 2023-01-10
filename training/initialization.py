@@ -2,7 +2,6 @@ from datasets import AvailableDatasets, AudioMNIST, CremaD
 from training.training import training_loop
 from neural_networks.audio_mel import AudioMelConverter, CustomAudioMelConverter
 from torch.utils.data import DataLoader
-from loss_compiling import HLoss
 import numpy as np
 import torch
 import utils
@@ -15,11 +14,12 @@ dataset_to_name = {
 
 
 class TrainingConfig:
-    def __init__(self, run_name='tmp', train_batch_size=128, test_batch_size=128, do_train_shuffle=True,
+    def __init__(self, run_name='tmp', dataset=AvailableDatasets.CremaD, train_batch_size=128, test_batch_size=128, do_train_shuffle=True,
                  do_test_shuffle=True, train_num_workers=2, test_num_workers=2, save_interval=5, checkpoint_interval=1,
                  updates_per_evaluation=50, updates_per_train_log_commit=10, gradient_accumulation=1, epochs=2,
-                 n_generated_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False):
+                 n_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False):
         self.run_name = run_name + '_' + self.random_id()
+        self.dataset = dataset
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
         self.do_train_shuffle = do_train_shuffle
@@ -33,7 +33,7 @@ class TrainingConfig:
         self.gradient_accumulation = gradient_accumulation
 
         self.epochs = epochs
-        self.n_generated_samples = n_generated_samples
+        self.n_samples = n_samples
         self.do_log = do_log
         self.librosa_audio_mel = librosa_audio_mel
         self.deterministic = deterministic
@@ -62,52 +62,8 @@ def create_architecture_from_config(config, device):
     return config.architecture(config, device)
 
 
-def init_models(experiment_setup, device):
-    if experiment_setup.training.deterministic:
-        set_seed(0)
-
-    # gender_classifier = ResNet18(2, 'relu').to(device)
-    # gender_classifier.model.load_state_dict(torch.load("neural_networks/pretrained_weights/best_gender_model.pt", map_location=torch.device('cpu')))  # privacy
-
-    label_classifier = create_model_from_config(experiment_setup.label_classifier).to(device)
-    if experiment_setup.label_classifier.pretrained_path:
-        label_classifier.model.load_state_dict(
-            torch.load(experiment_setup.label_classifier.pretrained_path, map_location=torch.device('cpu')))
-
-    secret_classifier = create_model_from_config(experiment_setup.secret_classifier).to(device)
-    if experiment_setup.secret_classifier.pretrained_path:
-        secret_classifier.model.load_state_dict(
-            torch.load(experiment_setup.secret_classifier.pretrained_path, map_location=torch.device('cpu')))
-
-    loss_funcs = {'filter_gen_distortion': torch.nn.L1Loss(), 'filter_gen_entropy': HLoss(),
-                  'filter_gen_adversarial': torch.nn.CrossEntropyLoss(
-                      label_smoothing=experiment_setup.loss.filter_gen_label_smoothing),
-                  'filter_disc': torch.nn.CrossEntropyLoss(
-                      label_smoothing=experiment_setup.loss.filter_disc_label_smoothing),
-                  'secret_gen_distortion': torch.nn.L1Loss(), 'secret_gen_entropy': HLoss(),
-                  'secret_gen_adversarial': torch.nn.CrossEntropyLoss(
-                      label_smoothing=experiment_setup.loss.secret_gen_label_smoothing),
-                  'secret_disc': torch.nn.CrossEntropyLoss(
-                      label_smoothing=experiment_setup.loss.secret_disc_label_smoothing)}
-
-    models = {
-        'filter_gen': create_model_from_config(experiment_setup.filter_gen).to(device),
-        'filter_disc': create_model_from_config(experiment_setup.filter_disc).to(device),
-        'secret_gen': create_model_from_config(experiment_setup.secret_gen).to(device),
-        'secret_disc': create_model_from_config(experiment_setup.secret_disc).to(device),
-        'label_classifier': label_classifier,
-        'secret_classifier': secret_classifier
-    }
-
-    lr = experiment_setup.training.lr
-    betas = experiment_setup.training.betas
-    optimizers = {
-        'filter_gen': torch.optim.Adam(models['filter_gen'].parameters(), lr['filter_gen'], betas['filter_gen']),
-        'filter_disc': torch.optim.Adam(models['filter_disc'].parameters(), lr['filter_disc'], betas['filter_disc']),
-        'secret_gen': torch.optim.Adam(models['secret_gen'].parameters(), lr['secret_gen'], betas['secret_gen']),
-        'secret_disc': torch.optim.Adam(models['secret_disc'].parameters(), lr['secret_disc'], betas['secret_disc'])
-    }
-    return loss_funcs, models, optimizers
+def create_model_from_config(config):
+    return config.model(**vars(config.args))
 
 
 def get_dataset(dataset_name):
@@ -117,9 +73,12 @@ def get_dataset(dataset_name):
         return CremaD.load()
 
 
-def init_training(dataset, experiment_setup, device):
-    train_data, test_data = get_dataset(dataset)
+def init_training(experiment_setup, device):
+    # load dataset
 
+    train_data, test_data = get_dataset(experiment_setup.training.dataset)
+
+    # print split ratios
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)
     test_female_speakar_ratio = sum(1 - test_data.gender_idx) / len(test_data.gender_idx)
     print(f'Training set contains {train_data.n_speakers} speakers with {int(100 * train_female_speakar_ratio)}% '
@@ -127,6 +86,7 @@ def init_training(dataset, experiment_setup, device):
     print(f'Test set contains {test_data.n_speakers} speakers with {int(100 * test_female_speakar_ratio)}% '
           f'female speakers. Total size is {len(test_data.gender_idx)}')
 
+    # init dataloaders
     train_loader = DataLoader(dataset=train_data, batch_size=experiment_setup.training.train_batch_size,
                               num_workers=experiment_setup.training.train_num_workers,
                               shuffle=experiment_setup.training.do_train_shuffle)
@@ -134,25 +94,30 @@ def init_training(dataset, experiment_setup, device):
                              num_workers=experiment_setup.training.test_num_workers,
                              shuffle=experiment_setup.training.do_test_shuffle)
 
+    # init Audio/Mel-converter
     if experiment_setup.training.librosa_audio_mel:
         audio_mel_converter = AudioMelConverter(experiment_setup.audio_mel)
     else:
         audio_mel_converter = CustomAudioMelConverter(experiment_setup.audio_mel)
+
+    # match model sizes with mel sizes and number of labels and secrets
     image_width, image_height = audio_mel_converter.output_shape(train_data[0][0])
-
-    if experiment_setup.training.deterministic:
-        set_seed(0)
-
     experiment_setup.architecture.image_width = image_width
     experiment_setup.architecture.image_height = image_height
     experiment_setup.architecture.n_genders = train_data.n_genders
     experiment_setup.architecture.n_labels = train_data.n_labels
-    # loss_funcs, models, optimizers = init_models(experiment_setup, device)
+
+    if experiment_setup.training.deterministic:
+        set_seed(0)
+
+    # init models etc etc
     architecture = create_architecture_from_config(experiment_setup.architecture, device)
 
+    # init wandb
     if experiment_setup.training.do_log:
-        log.init(utils.nestedConfigs2dict(experiment_setup), project=dataset_to_name[dataset],
+        log.init(utils.nestedConfigs2dict(experiment_setup), project=dataset_to_name[experiment_setup.training.dataset],
                  run_name=experiment_setup.training.run_name)
 
+    # start training loop
     training_loop(train_loader, test_loader, experiment_setup.training, architecture, audio_mel_converter,
                   experiment_setup.audio_mel.sample_rate, device)
