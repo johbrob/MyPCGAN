@@ -1,0 +1,1 @@
+from architectures.pcgan.model import PCGAN, PCGANConfig

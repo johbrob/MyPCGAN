@@ -11,8 +11,8 @@ class WorkerConfig:
         self.device = device
         self.available = True
 
-    def assignJob(self, proc):
-        self.currentJob = proc
+    def assign_job(self, proc):
+        self.current_job = proc
 
 
 AVAILABLE_DATASETS = {
@@ -24,7 +24,8 @@ AVAILABLE_DATASETS = {
 def parallel_experiment_wrapper(queue, experiment_setting, device):
     experiment_setting.training.device = device
     print("--------------------------------------------------------------------")
-    print(f" Start training on '{experiment_setting.training.dataset.name}' dataset with '{str(experiment_setting)}' setting on {device}")
+    print(f" Start training on '{experiment_setting.training.dataset.name}' dataset with "
+          f"'{str(experiment_setting)}' setting on {device}")
     print("--------------------------------------------------------------------")
 
     init_training(experiment_setup=experiment_setting, device=device)
@@ -33,7 +34,21 @@ def parallel_experiment_wrapper(queue, experiment_setting, device):
     queue.put(device)
 
 
-def parallel_experiment_queue(queue, workers):
+def parallel_whisper_experiment_wrapper(queue, experiment_setting, device):
+    from whisper_gender_classification import main
+    print("--------------------------------------------------------------------")
+    print(f" Start whisper gender classification training on '{experiment_setting['dataset'].name}' dataset "
+          f"with '{str(experiment_setting)}' setting on {device}")
+    print("--------------------------------------------------------------------")
+    main(settings=experiment_setting, device=device)
+
+    print("Finishing experiment on device {}".format(device))
+    queue.put(device)
+
+
+def parallel_experiment_queue(experiment, workers):
+    queue = AVAILABLE_RUNS[experiment]
+
     print('Experiment queue has length', len(queue))
 
     import torch.multiprocessing as mp
@@ -47,7 +62,12 @@ def parallel_experiment_queue(queue, workers):
     processes = {}
     for experiment_setting in tqdm.tqdm(queue):
         device = messageQueue.get()
-        p = mp.Process(target=parallel_experiment_wrapper, args=(messageQueue, experiment_setting, device))
+
+        if experiment == 'whisper':
+            p = mp.Process(target=parallel_whisper_experiment_wrapper, args=(messageQueue, experiment_setting, device))
+        else:
+            p = mp.Process(target=parallel_experiment_wrapper, args=(messageQueue, experiment_setting, device))
+
         p.start()
         processes[device] = p
 
@@ -72,16 +92,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'experiment': 'pcgan', 'gpus': [0]}
+    args = {'experiment': 'whisper', 'gpus': [0]}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpus'] == [-1]:
         print("Using CPU worker:")
         workers = [WorkerConfig('cpu')]
-    elif (len(args['gpus']) <= 0):
+    elif len(args['gpus']) <= 0:
         raise Exception("No devices specified")
     else:
         print("Using GPU workers:", args['gpus'])
         workers = [WorkerConfig('cuda:{}'.format(i)) for i in args['gpus']]
 
-    parallel_experiment_queue(AVAILABLE_RUNS[args['experiment']], workers)
+    parallel_experiment_queue(args['experiment'], workers)
+

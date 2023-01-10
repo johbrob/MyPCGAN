@@ -41,7 +41,6 @@ class ExperimentSetup:
         self.audio_mel = audio_mel_config
         self.architecture = architecture_config
 
-
     def get_configs(self):
         return self.training, self.audio_mel, self.architecture
 

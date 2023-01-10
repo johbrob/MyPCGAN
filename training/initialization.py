@@ -1,4 +1,4 @@
-from datasets import AvailableDatasets, AudioMNIST, CremaD
+from datasets import AvailableDatasets, AudioMNIST, CremaD, get_dataset
 from training.training import training_loop
 from neural_networks.audio_mel import AudioMelConverter, CustomAudioMelConverter
 from torch.utils.data import DataLoader
@@ -64,13 +64,6 @@ def create_architecture_from_config(config, device):
 
 def create_model_from_config(config):
     return config.model(**vars(config.args))
-
-
-def get_dataset(dataset_name):
-    if dataset_name == AvailableDatasets.AudioMNIST:
-        return AudioMNIST.load()
-    elif dataset_name == AvailableDatasets.CremaD:
-        return CremaD.load()
 
 
 def init_training(experiment_setup, device):

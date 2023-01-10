@@ -1,0 +1,1 @@
+from architectures.whisper_pcgan.model import WhisperPcgan, WhistperPcganConfig

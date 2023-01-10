@@ -13,4 +13,4 @@ if __name__ == '__main__':
     if args['dataset'] == 'audiomnist':
         create_audiomnist(local_vars.AUDIO_MNIST_PATH, local_vars.PREPROCESSED_DATA_PATH, 0.20, 8192, 8000, True)
     elif args['dataset'] == 'cremad':
-        create_crema_d(local_vars.CREMA_D_PATH, local_vars.PREPROCESSED_DATA_PATH, 0.20, 40000, 8000, True)
+        create_crema_d(local_vars.CREMA_D_PATH, local_vars.PREPROCESSED_DATA_PATH, 0.20, 40000, 16000, True)
