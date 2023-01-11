@@ -1,5 +1,5 @@
 from architectures.alt_gen.metrics_compiling import compute_metrics
-from architectures.utils import create_model_from_config
+from architectures.utils import preprocess_spectrograms, create_model_from_config
 from architectures.alt_gen import loss_compiling
 from utils import Mode
 import torch
@@ -63,6 +63,7 @@ class OneStepGAN:
 
         self.generate_both_secrets = config.generate_both_secrets
 
+
     def _gen_forward_pass(self, mels):
         z = torch.randn(mels.shape[0], self.gen.noise_dim).to(mels.device)
         fake_secret = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
@@ -105,7 +106,11 @@ class OneStepGAN:
         return {'fake_secret_score': fake_secret_score, 'real_secret_score': real_secret_score,
                 'alt_fake_secret_score': alt_fake_secret_score}
 
-    def forward_pass(self, mels, secrets, labels):
+    def forward_pass(self, audio, secrets, labels):
+
+        mels = self.audio_mel_converter.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
+        mels, means, stds = preprocess_spectrograms(mels)
+        mels = mels.unsqueeze(dim=1).to(self.device)  # mels: (bsz, 1, n_mels, frames)
         assert mels.dim() == 4
 
         gen_output = self._gen_forward_pass(mels)
@@ -128,8 +133,13 @@ class OneStepGAN:
             self.fake_disc.eval()
             self.secret_disc.eval()
 
-    def generate_sample(self, audio, id, label, secret, mels, stds, means, audio_mel_converter, epoch, sampling_rate,
+    def generate_sample(self, audio, id, label, secret, audio_mel_converter, epoch, sampling_rate,
                         save_dir, device):
+
+        mels = self.audio_mel_converter.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
+        mels, means, stds = preprocess_spectrograms(mels)
+        mels = mels.unsqueeze(dim=1).to(self.device)  # mels: (bsz, 1, n_mels, frames)
+        assert mels.dim() == 4
 
         speaker_str = f'speaker_{id.item()}_label_{label.item()}_secret_{secret.item()}'
         speaker_epoch_str = speaker_str + f'_epoch_{epoch}'

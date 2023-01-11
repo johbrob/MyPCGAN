@@ -36,13 +36,13 @@
 
 
 class ExperimentSetup:
-    def __init__(self, training_config, audio_mel_config, architecture_config):
+    def __init__(self, training_config, architecture_config):
         self.training = training_config
-        self.audio_mel = audio_mel_config
+        # self.audio_mel = audio_mel_config
         self.architecture = architecture_config
 
     def get_configs(self):
-        return self.training, self.audio_mel, self.architecture
+        return self.training, self.architecture
 
     def __str__(self):
         return self.training.run_name.rsplit('_')[0]

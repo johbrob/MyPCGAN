@@ -1,4 +1,4 @@
-from training.initialization import create_model_from_config
+from architectures.utils import preprocess_spectrograms, create_model_from_config
 from architectures.pcgan.loss_computations import compute_losses, LossConfig
 from architectures.pcgan.metrics_computations import compute_metrics
 from utils import Mode
@@ -145,8 +145,13 @@ class PCGAN:
         return {'fake_secret_score': fake_secret_preds_disc, 'real_secret_score': real_secret_preds_disc,
                 'fake_secret': fake_secret_disc}
 
-    def forward_pass(self, mels, secrets, labels):
+    def forward_pass(self, audio, secrets, labels):
+
+        mels = self.audio_mel_converter.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
+        mels, means, stds = preprocess_spectrograms(mels)
+        mels = mels.unsqueeze(dim=1).to(self.device)  # mels: (bsz, 1, n_mels, frames)
         assert mels.dim() == 4
+
         filter_gen_output = self._filter_gen_forward_pass(mels, secrets)
         secret_gen_output = self._secret_gen_forward_pass(mels, filter_gen_output['filtered_mel'])
         filter_disc_output = self._filter_disc_forward_pass(mels, filter_gen_output['filtered_mel'])
@@ -163,7 +168,12 @@ class PCGAN:
 
         return batch_metrics, losses
 
-    def generate_sample(self, audio, mel, std, mean, secret, label, id, audio_mel_converter, epoch):
+    def generate_sample(self, audio, secret, label, id, audio_mel_converter, epoch):
+
+        mel = self.audio_mel_converter.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
+        mel, mean, std = preprocess_spectrograms(mel)
+        mel = mel.unsqueeze(dim=1).to(self.device)  # mels: (bsz, 1, n_mels, frames)
+        assert mel.dim() == 4
 
         # filter_gen
         filter_z = torch.randn(mel.shape[0], self.filter_gen.noise_dim).to(self.device)

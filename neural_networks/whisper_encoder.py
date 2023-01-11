@@ -1,4 +1,4 @@
-from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
+from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoFeatureExtractor
 import enum
 
 
@@ -18,7 +18,7 @@ class WhisperEncoderConfig:
 
 class WhisperEncoder:
     def __init__(self, config, device):
-        self.processor = AutoProcessor.from_pretrained(config.model_size.value)
+        # self.processor = AutoProcessor.from_pretrained(config.model_size.value)
         self.whisper_encoder = AutoModelForSpeechSeq2Seq.from_pretrained(config.model_size.value).get_encoder().to(device)
         self.whisper_encoder._freeze_parameters()
         self.embedding_dim = self.whisper_encoder.embed_positions.embedding_dim
@@ -26,10 +26,4 @@ class WhisperEncoder:
         self.device = device
 
     def __call__(self, data):
-        input_features = [audio.squeeze().cpu().numpy() for audio in data]
-
-        print(data.shape)
-        print(len(input_features), input_features[0].shape)
-        input_features = self.processor(input_features, return_tensors="pt",
-                                        sampling_rate=self.sampling_rate).input_features
-        return self.whisper_encoder(input_features.to(self.device)).last_hidden_state
+        return self.whisper_encoder(data.to(self.device)).last_hidden_state

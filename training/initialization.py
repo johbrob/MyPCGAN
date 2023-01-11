@@ -88,17 +88,19 @@ def init_training(experiment_setup, device):
                              shuffle=experiment_setup.training.do_test_shuffle)
 
     # init Audio/Mel-converter
-    if experiment_setup.training.librosa_audio_mel:
-        audio_mel_converter = AudioMelConverter(experiment_setup.audio_mel)
-    else:
-        audio_mel_converter = CustomAudioMelConverter(experiment_setup.audio_mel)
+    # if experiment_setup.training.librosa_audio_mel:
+    #     audio_mel_converter = AudioMelConverter(experiment_setup.audio_mel)
+    # else:
+    #     audio_mel_converter = CustomAudioMelConverter(experiment_setup.audio_mel)
 
     # match model sizes with mel sizes and number of labels and secrets
-    image_width, image_height = audio_mel_converter.output_shape(train_data[0][0])
-    experiment_setup.architecture.image_width = image_width
-    experiment_setup.architecture.image_height = image_height
-    experiment_setup.architecture.n_genders = train_data.n_genders
-    experiment_setup.architecture.n_labels = train_data.n_labels
+    # image_width, image_height = audio_mel_converter.output_shape(train_data[0][0])
+    # experiment_setup.architecture.image_width = image_width
+    # experiment_setup.architecture.image_height = image_height
+    # experiment_setup.architecture.n_genders = train_data.n_genders
+    # experiment_setup.architecture.n_labels = train_data.n_labels
+    experiment_setup.architecture.data_info = {'sample_data': train_data[0], 'n_labels': train_data.n_labels,
+                                               'n_secrets': train_data.n_genders}
 
     if experiment_setup.training.deterministic:
         set_seed(0)
@@ -112,5 +114,4 @@ def init_training(experiment_setup, device):
                  run_name=experiment_setup.training.run_name)
 
     # start training loop
-    training_loop(train_loader, test_loader, experiment_setup.training, architecture, audio_mel_converter,
-                  experiment_setup.audio_mel.sample_rate, device)
+    training_loop(train_loader, test_loader, experiment_setup.training, architecture, device)

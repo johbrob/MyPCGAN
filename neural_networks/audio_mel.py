@@ -3,6 +3,7 @@ from librosa.filters import mel as librosa_mel_fn
 from librosa.feature.inverse import mel_to_audio
 from librosa.feature import melspectrogram
 import torch.nn.functional as F
+from typing import Union
 import torch.nn as nn
 import numpy as np
 import local_vars
