@@ -14,10 +14,11 @@ dataset_to_name = {
 
 
 class TrainingConfig:
-    def __init__(self, run_name='tmp', dataset=AvailableDatasets.CremaD, train_batch_size=128, test_batch_size=128, do_train_shuffle=True,
-                 do_test_shuffle=True, train_num_workers=2, test_num_workers=2, save_interval=5, checkpoint_interval=1,
-                 updates_per_evaluation=50, updates_per_train_log_commit=10, gradient_accumulation=1, epochs=2,
-                 n_samples=1, do_log=True, librosa_audio_mel=False, deterministic=False):
+    def __init__(self, run_name='tmp', dataset=AvailableDatasets.CremaD, train_batch_size=128, test_batch_size=128,
+                 do_train_shuffle=True, do_test_shuffle=True, train_num_workers=2, test_num_workers=2, save_interval=5,
+                 checkpoint_interval=1, updates_per_evaluation=50, updates_per_train_log_commit=10,
+                 gradient_accumulation=1, epochs=2, n_samples=1, do_log=True, librosa_audio_mel=False,
+                 deterministic=False, n_train_samples=None, n_test_samples=None):
         self.run_name = run_name + '_' + self.random_id()
         self.dataset = dataset
         self.train_batch_size = train_batch_size
@@ -37,6 +38,9 @@ class TrainingConfig:
         self.do_log = do_log
         self.librosa_audio_mel = librosa_audio_mel
         self.deterministic = deterministic
+
+        self.n_train_samples = n_train_samples
+        self.n_test_samples = n_test_samples
 
     def random_id(self):
         return str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
@@ -69,7 +73,9 @@ def create_model_from_config(config):
 def init_training(experiment_setup, device):
     # load dataset
 
-    train_data, test_data = get_dataset(experiment_setup.training.dataset)
+    train_data, test_data = get_dataset(experiment_setup.training.dataset,
+                                        n_train_samples=experiment_setup.training.n_train_samples,
+                                        n_test_samples=experiment_setup.training.n_test_samples)
 
     # print split ratios
     train_female_speakar_ratio = sum(1 - train_data.gender_idx) / len(train_data.gender_idx)

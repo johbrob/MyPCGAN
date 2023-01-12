@@ -19,9 +19,10 @@ class ModelConfig:
 Q = [
     ExperimentSetup(
         training_config=TrainingConfig(
-            run_name='BASE_entropy', dataset=AvailableDatasets.CremaD, epochs=1000, train_batch_size=128,
-            test_batch_size=128, deterministic=False, gradient_accumulation=1, save_interval=10, checkpoint_interval=10,
-            updates_per_train_log_commit=10, updates_per_evaluation=50, do_log=False, test_num_workers=0),
+            run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000, train_batch_size=4,
+            test_batch_size=4, deterministic=False, gradient_accumulation=4, save_interval=1, checkpoint_interval=10,
+            updates_per_train_log_commit=10, updates_per_evaluation=50, do_log=True, test_num_workers=0,
+            n_train_samples=128, n_test_samples=64),
         architecture_config=WhistperPcganConfig(
             filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
             filter_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),

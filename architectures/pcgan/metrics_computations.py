@@ -25,8 +25,8 @@ def _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels):
                                  zip(all_fake_scores, secret_gen_output['fake_secret'])])
 
     male_female_diff = loss_funcs['secret_gen_distortion'](male_mels, female_mels)
-    male_distortion = loss_funcs['secret_gen_distortion'](male_mels, mels)
-    female_distortion = loss_funcs['secret_gen_distortion'](female_mels, mels)
+    male_distortion = loss_funcs['secret_gen_distortion'](male_mels.squeeze(), mels)
+    female_distortion = loss_funcs['secret_gen_distortion'](female_mels.squeeze(), mels)
     male_adversarial = loss_funcs['secret_gen_adversarial'](male_scores, secret_gen_output['fake_secret'])
     female_adversarial = loss_funcs['secret_gen_adversarial'](female_scores, secret_gen_output['fake_secret'])
 

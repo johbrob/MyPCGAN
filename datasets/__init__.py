@@ -9,8 +9,8 @@ class AvailableDatasets(enum.Enum):
     CremaD = 2
 
 
-def get_dataset(dataset_name: AvailableDatasets) -> AudioDataset:
+def get_dataset(dataset_name: AvailableDatasets, n_train_samples: int = None, n_test_samples: int = None) -> AudioDataset:
     if dataset_name == AvailableDatasets.AudioMNIST:
-        return AudioMNIST.load()
+        return AudioMNIST.load(n_train_samples=n_train_samples, n_test_samples=n_test_samples)
     elif dataset_name == AvailableDatasets.CremaD:
-        return CremaD.load()
+        return CremaD.load(n_train_samples=n_train_samples, n_test_samples=n_test_samples)

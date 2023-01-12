@@ -65,11 +65,11 @@ class WhisperPcgan:
 
         self.audio2mel = config.audio2mel.model(config.audio2mel.args)
         self.mel2audio = config.mel2audio.model(config.mel2audio.args)
+        self.audio_encoder = WhisperEncoder(config.whisper, device)
         # self.audio2mel = create_model_from_config(config.audio2mel).to(device)
         # self.mel2audio = create_model_from_config(config.mel2audio).to(device)
 
         image_width, image_height = self.audio2mel.output_shape(config.data_info['sample_data'][0])
-        print()
         self.n_secrets = config.data_info['n_secrets']
         self.n_labels = config.data_info['n_labels']
 
@@ -101,7 +101,6 @@ class WhisperPcgan:
         self.secret_disc = create_model_from_config(config.secret_disc).to(device)
         self.label_classifier = create_model_from_config(config.label_classifier).to(device)
         self.secret_classifier = create_model_from_config(config.secret_classifier).to(device)
-        self.audio_encoder = WhisperEncoder(config.whisper, device)
 
         if config.label_classifier.pretrained_path:
             self.label_classifier.model.load_state_dict(
@@ -122,13 +121,13 @@ class WhisperPcgan:
 
         self.loss_config = config.loss
         self.generate_both_secrets = config.generate_both_secrets
-
+        self.sampling_rate = config.audio2mel.args.sampling_rate
         self.device = device
 
     def _filter_gen_forward_pass(self, mels, secrets):
         mel_encodings = self.audio_encoder(mels)
         filter_z = torch.randn(mels.shape[0], self.filter_gen.noise_dim).to(mels.device)
-        filtered_mels = self.filter_gen(mels, filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
+        filtered_mels = self.filter_gen(mels.unsqueeze(dim=1), filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
         filtered_secret_preds_gen = self.filter_disc(filtered_mels, frozen=True)  # (bsz, n_secret)
         filtered_mel_encodings = self.audio_encoder(mels)
         return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen,
@@ -139,7 +138,7 @@ class WhisperPcgan:
         fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
         fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
         fake_secret_preds_gen = self.secret_disc(fake_mel, frozen=True)  # (bsz, n_secrets + 1)
-        fake_mel_encodings = self.audio_encoder(fake_mel)
+        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze())
 
         secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
                              'fake_secret_score': fake_secret_preds_gen, 'fake_mel_encoding': fake_mel_encodings}
@@ -149,7 +148,7 @@ class WhisperPcgan:
             alt_fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, 1 - fake_secret_gen, frozen=True)
             # (bsz, n_secrets + 1)
             alt_fake_secret_preds_gen = self.secret_disc(alt_fake_mel, frozen=True)
-            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel)
+            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze())
             secret_gen_output.update(
                 {'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen,
                  'alt_fake_mel_encoding': alt_fake_mel_encodings})
@@ -158,23 +157,25 @@ class WhisperPcgan:
 
     def _filter_disc_forward_pass(self, mels, filtered_mels):
         filtered_secret_preds_disc = self.filter_disc(filtered_mels.detach())  # (bsz, n_secret)
-        unfiltered_secret_preds_disc = self.filter_disc(mels.detach(), frozen=True)  # (bsz, n_secret)
+        unfiltered_secret_preds_disc = self.filter_disc(mels.unsqueeze(dim=1).detach(), frozen=True)  # (bsz, n_secret)
         return {'filtered_secret_score': filtered_secret_preds_disc,
                 'unfiltered_secret_score': unfiltered_secret_preds_disc}
 
     def _secret_disc_forward_pass(self, mels, fake_mel):
         fake_secret_preds_disc = self.secret_disc(fake_mel.detach().clone())  # (bsz, n_secrets + 1)
-        real_secret_preds_disc = self.secret_disc(mels)  # (bsz, n_secrets + 1)
+        real_secret_preds_disc = self.secret_disc(mels.unsqueeze(dim=1))  # (bsz, n_secrets + 1)
         fake_secret_disc = 2 * torch.ones(mels.size(0), requires_grad=False, dtype=torch.int64).to(
             mels.device)  # (bsz,)
         return {'fake_secret_score': fake_secret_preds_disc, 'real_secret_score': real_secret_preds_disc,
                 'fake_secret': fake_secret_disc}
 
     def forward_pass(self, audio, secrets, labels):
+
         mels = self.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
-        mels, means, stds = preprocess_spectrograms(mels)
-        mels = mels.unsqueeze(dim=1).to(self.device)  # mels: (bsz, 1, n_mels, frames)
-        assert mels.dim() == 4
+        # mels, means, stds = preprocess_spectrograms(mels)
+        mels = mels.to(self.device)  # mels: (bsz, 1, n_mels, frames)
+        # print(mels.shape)
+        # assert mels.dim() == 4
 
         filter_gen_output = self._filter_gen_forward_pass(mels, secrets)
         secret_gen_output = self._secret_gen_forward_pass(mels, filter_gen_output['filtered_mel'])

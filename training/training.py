@@ -78,7 +78,7 @@ def evaluate_on_dataset(data_loader, architecture, device):
     return metrics
 
 
-def save_samples(example_dir, data_loader, architecture, epoch, sampling_rate, device, n_samples):
+def save_samples(example_dir, data_loader, architecture, epoch, device, n_samples):
     architecture.set_mode(utils.Mode.EVAL)
     save_dir = utils.create_subdir(example_dir, 'audio')
 
@@ -97,4 +97,4 @@ def save_samples(example_dir, data_loader, architecture, epoch, sampling_rate, d
             # mel = mel.unsqueeze(dim=1).to(device)
 
             sample = architecture.generate_sample(audio, secret, label, id, epoch)
-            [utils.save_audio_file(os.path.join(save_dir, k), sampling_rate, v) for k, v in sample.items()]
+            [utils.save_audio_file(os.path.join(save_dir, k), architecture.sampling_rate, v) for k, v in sample.items()]

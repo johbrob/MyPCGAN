@@ -49,7 +49,8 @@ class AudioDataset(Dataset):
         return len(self.audio_files)
 
     @classmethod
-    def load(cls, sampling_rate=None, segment_length=None, even_gender_proportions=None):
+    def load(cls, sampling_rate=None, segment_length=None, even_gender_proportions=None, n_train_samples=None,
+             n_test_samples=None):
         if sampling_rate is not None or segment_length is not None or even_gender_proportions is not None:
             raise NotImplementedError("No support for custom settings for now")
 
@@ -66,16 +67,21 @@ class AudioDataset(Dataset):
         save_path = cls.get_save_path() if cls.get_save_path()[-1] == '/' else cls.get_save_path() + '/'
 
         train_annotations = pd.read_csv(save_path + prefix + 'train_annotations.csv')
+        if n_train_samples:
+            train_annotations = train_annotations.sample(n=n_train_samples)
         trainData = cls(train_annotations, cls.get_default_sampling_rate(), cls.get_default_segment_length())
 
         test_annotations = pd.read_csv(save_path + prefix + 'test_annotations.csv')
+        if n_test_samples:
+            test_annotations = test_annotations.sample(n=n_test_samples)
         testData = cls(test_annotations, cls.get_default_sampling_rate(), cls.get_default_segment_length())
 
         return trainData, testData
 
     @staticmethod
     @abstractmethod
-    def _create_dataset(sampling_rate=None, segment_length=None, test_split_ratio=None, even_gender_proportions=None) -> None:
+    def _create_dataset(sampling_rate=None, segment_length=None, test_split_ratio=None,
+                        even_gender_proportions=None) -> None:
         pass
 
     @staticmethod
