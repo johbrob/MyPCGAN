@@ -20,7 +20,8 @@ class HLoss(torch.nn.Module):
 
 class WhistperPcganConfig:
     def __init__(self, filter_gen_config, filter_disc_config, secret_gen_config, secret_disc_config,
-                 label_classifier_config, secret_classifier_config, whisper_config, audio2mel_config, mel2audio_config,
+                 # label_classifier_config, secret_classifier_config,
+                 whisper_config, audio2mel_config, mel2audio_config,
                  lr=None, betas=None, generate_both_secrets=True, filter_gen_label_smoothing=0,
                  secret_gen_label_smoothing=0, filter_disc_label_smoothing=0, secret_disc_label_smoothing=0,
                  loss_config=LossConfig()):
@@ -32,8 +33,8 @@ class WhistperPcganConfig:
         self.secret_gen = secret_gen_config
         self.secret_disc = secret_disc_config
 
-        self.label_classifier = label_classifier_config
-        self.secret_classifier = secret_classifier_config
+        # self.label_classifier = label_classifier_config
+        # self.secret_classifier = secret_classifier_config
 
         self.whisper = whisper_config
 
