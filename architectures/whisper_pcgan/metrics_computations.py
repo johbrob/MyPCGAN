@@ -94,4 +94,5 @@ def compute_metrics(mels, secret, label, filter_gen_output, filter_disc_output, 
 
     return {'filter_gen': filter_gen_metrics, 'secret_gen': secret_gen_metrics,
             'filter_disc': filter_disc_metrics, 'secret_disc': secret_disc_metrics,
-            'label_classifier': label_prediction_metrics, 'secret_classifier': secret_prediction_metrics}
+            # 'label_classifier': label_prediction_metrics, 'secret_classifier': secret_prediction_metrics
+            }

@@ -201,9 +201,9 @@ class WhisperPcgan:
         filter_disc_output = self._filter_disc_forward_pass(mels, filter_gen_output['filtered_mel'])
         secret_disc_output = self._secret_disc_forward_pass(mels, secret_gen_output['faked_mel'])
 
-        label_preds = self.label_classifier(secret_gen_output['faked_mel'])
-        secret_preds = self.secret_classifier(secret_gen_output['faked_mel'])
-        secret_disc_output.update({'label_score': label_preds, 'secret_score': secret_preds})
+        # label_preds = self.label_classifier(secret_gen_output['faked_mel'])
+        # secret_preds = self.secret_classifier(secret_gen_output['faked_mel'])
+        # secret_disc_output.update({'label_score': label_preds, 'secret_score': secret_preds})
 
         losses = compute_losses(self.loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
                                 secret_gen_output, secret_disc_output, self.loss_config)
