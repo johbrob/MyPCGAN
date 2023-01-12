@@ -99,15 +99,6 @@ class WhisperPcgan:
         self.filter_disc = create_model_from_config(config.filter_disc).to(device)
         self.secret_gen = create_model_from_config(config.secret_gen).to(device)
         self.secret_disc = create_model_from_config(config.secret_disc).to(device)
-        self.label_classifier = create_model_from_config(config.label_classifier).to(device)
-        self.secret_classifier = create_model_from_config(config.secret_classifier).to(device)
-
-        if config.label_classifier.pretrained_path:
-            self.label_classifier.model.load_state_dict(
-                torch.load(config.label_classifier.pretrained_path, map_location=torch.device('cpu')))
-        if config.secret_classifier.pretrained_path:
-            self.secret_classifier.model.load_state_dict(
-                torch.load(config.secret_classifier.pretrained_path, map_location=torch.device('cpu')))
 
         self.lr = config.lr
         betas = config.betas
@@ -139,7 +130,7 @@ class WhisperPcgan:
         # fake_mel_male = (torch.squeeze(fake_mel_male.cpu(), 1) * 3 * std + mean)
         # fake_mel_female = (torch.squeeze(fake_mel_female.cpu(), 1) * 3 * std + mean)
         # mel = torch.squeeze(mel.cpu() * 3 * std + mean)
-        cut_off = audio.shape[-1] # 64000
+        cut_off = audio.shape[-1]  # 64000
 
         print(mel.shape, filtered_mel.shape, fake_mel_male.shape, fake_mel_female.shape)
         audio = audio.squeeze().cpu()
@@ -236,20 +227,16 @@ class WhisperPcgan:
         fake_mel_male = self.secret_gen(filtered_mel, secret_z, fake_secret_male)
         fake_mel_female = self.secret_gen(filtered_mel, secret_z, fake_secret_female)
 
-        # predict label
-        pred_label_male = torch.argmax(self.label_classifier(fake_mel_male).data, 1)
-        pred_label_female = torch.argmax(self.label_classifier(fake_mel_female).data, 1)
-
-        # predict secret
-        pred_secret_male = torch.argmax(self.secret_classifier(fake_mel_male).data, 1)
-        pred_secret_female = torch.argmax(self.secret_classifier(fake_mel_female).data, 1)
+        # secret disc
+        pred_label_male = self.secret_disc(fake_mel_male.detach().clone())
+        pred_label_female = self.secret_disc(fake_mel_female.detach().clone())
 
         audio, a2m2_audio, filtered_audio, audio_male, audio_female = self.postprocess(audio, mel, filtered_mel,
                                                                                        fake_mel_male, fake_mel_female)
         print(audio.shape, a2m2_audio.shape, filtered_audio.shape, audio_male.shape, audio_female.shape)
 
-        output = self._build_output_dict(id, label, epoch, pred_label_male, pred_label_female,
-                                         audio, filtered_audio, a2m2_audio, audio_male, audio_female)
+        output = self._build_output_dict(id, label, epoch, audio, pred_label_male, pred_label_female, filtered_audio,
+                                         a2m2_audio, audio_male, audio_female)
 
         [print(v.shape) for k, v in output.items()]
         return output
@@ -283,8 +270,8 @@ class WhisperPcgan:
             torch.save(v.state_dict(), os.path.join(checkpoint_dir, f'optimizer_{k}_epoch_{epoch}.pt'))
             torch.save(v.state_dict(), os.path.join(checkpoint_dir, f'optimizer_{k}_latest_epoch_{epoch}.pt'))
 
-    def _build_output_dict(self, id, label, epoch, pred_label_male, pred_label_female,
-                           audio, filtered_audio, a2m2_audio, audio_male, audio_female):
+    def _build_output_dict(self, id, label, epoch, audio, pred_label_male, pred_label_female, filtered_audio,
+                           a2m2_audio, audio_male, audio_female):
         speaker_digit_str = f'speaker_{id.item()}_label_{label.item()}'
         speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
 
