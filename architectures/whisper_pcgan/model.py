@@ -171,7 +171,7 @@ class WhisperPcgan:
         fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
         fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
         fake_secret_preds_gen = self.secret_disc(fake_mel, frozen=True)  # (bsz, n_secrets + 1)
-        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze())[..., :250]  # skip all the padding elements
+        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze())
 
         secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
                              'fake_secret_score': fake_secret_preds_gen, 'fake_mel_encoding': fake_mel_encodings}
@@ -181,8 +181,7 @@ class WhisperPcgan:
             alt_fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, 1 - fake_secret_gen, frozen=True)
             # (bsz, n_secrets + 1)
             alt_fake_secret_preds_gen = self.secret_disc(alt_fake_mel, frozen=True)
-            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze())[...,
-                                     :250]  # skip all the padding elements
+            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze())
             secret_gen_output.update(
                 {'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen,
                  'alt_fake_mel_encoding': alt_fake_mel_encodings})
