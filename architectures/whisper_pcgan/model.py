@@ -124,12 +124,45 @@ class WhisperPcgan:
         self.sampling_rate = config.audio2mel.args.sampling_rate
         self.device = device
 
+    def preprocess(self, audio):
+        mels = self.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
+        # mels, means, stds = preprocess_spectrograms(mels)
+        mels = mels.to(self.device)  # mels: (bsz, 1, n_mels, frames)
+        # print(mels.shape)
+        # assert mels.dim() == 4
+        return mels
+
+    def postprocess(self, audio, mel, filtered_mel, fake_mel_male, fake_mel_female):
+
+        # unnormalize
+        # filtered_mel = (torch.squeeze(filtered_mel.cpu(), 1) * 3 * std + mean)
+        # fake_mel_male = (torch.squeeze(fake_mel_male.cpu(), 1) * 3 * std + mean)
+        # fake_mel_female = (torch.squeeze(fake_mel_female.cpu(), 1) * 3 * std + mean)
+        # mel = torch.squeeze(mel.cpu() * 3 * std + mean)
+        cut_off = audio.shape[-1] # 64000
+
+        print(mel.shape, filtered_mel.shape, fake_mel_male.shape, fake_mel_female.shape)
+        audio = audio.squeeze().cpu()
+        a2m2_audio = self.mel2audio(mel.squeeze().cpu())
+        filtered_audio = self.mel2audio(filtered_mel.squeeze().cpu())
+        audio_male = self.mel2audio(fake_mel_male.squeeze().cpu())
+        audio_female = self.mel2audio(fake_mel_female.squeeze().cpu())
+
+        print(audio.shape, a2m2_audio.shape, filtered_audio.shape, audio_male.shape, audio_female.shape)
+        a2m2_audio = a2m2_audio[..., :cut_off]  # .squeeze(dim=0)
+        filtered_audio = filtered_audio[..., :cut_off]  # .squeeze(dim=0)
+        audio_male = audio_male[..., :cut_off]  # .squeeze(dim=0)
+        audio_female = audio_female[..., :cut_off]  # .squeeze(dim=0)
+        print(audio.shape, a2m2_audio.shape, filtered_audio.shape, audio_male.shape, audio_female.shape)
+
+        return audio, a2m2_audio, filtered_audio, audio_male, audio_female
+
     def _filter_gen_forward_pass(self, mels, secrets):
-        mel_encodings = self.audio_encoder(mels)
+        mel_encodings = self.audio_encoder(mels.squeeze())
         filter_z = torch.randn(mels.shape[0], self.filter_gen.noise_dim).to(mels.device)
         filtered_mels = self.filter_gen(mels.unsqueeze(dim=1), filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
         filtered_secret_preds_gen = self.filter_disc(filtered_mels, frozen=True)  # (bsz, n_secret)
-        filtered_mel_encodings = self.audio_encoder(mels)
+        filtered_mel_encodings = self.audio_encoder(filtered_mels.squeeze())
         return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen,
                 'mel_encodings': mel_encodings, 'filtered_mel_encodings': filtered_mel_encodings}
 
@@ -138,7 +171,7 @@ class WhisperPcgan:
         fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
         fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
         fake_secret_preds_gen = self.secret_disc(fake_mel, frozen=True)  # (bsz, n_secrets + 1)
-        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze())
+        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze())[..., :250]  # skip all the padding elements
 
         secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
                              'fake_secret_score': fake_secret_preds_gen, 'fake_mel_encoding': fake_mel_encodings}
@@ -148,7 +181,8 @@ class WhisperPcgan:
             alt_fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, 1 - fake_secret_gen, frozen=True)
             # (bsz, n_secrets + 1)
             alt_fake_secret_preds_gen = self.secret_disc(alt_fake_mel, frozen=True)
-            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze())
+            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze())[...,
+                                     :250]  # skip all the padding elements
             secret_gen_output.update(
                 {'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen,
                  'alt_fake_mel_encoding': alt_fake_mel_encodings})
@@ -170,12 +204,7 @@ class WhisperPcgan:
                 'fake_secret': fake_secret_disc}
 
     def forward_pass(self, audio, secrets, labels):
-
-        mels = self.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
-        # mels, means, stds = preprocess_spectrograms(mels)
-        mels = mels.to(self.device)  # mels: (bsz, 1, n_mels, frames)
-        # print(mels.shape)
-        # assert mels.dim() == 4
+        mels = self.preprocess(audio)
 
         filter_gen_output = self._filter_gen_forward_pass(mels, secrets)
         secret_gen_output = self._secret_gen_forward_pass(mels, filter_gen_output['filtered_mel'])
@@ -195,21 +224,18 @@ class WhisperPcgan:
 
     def generate_sample(self, audio, secret, label, id, epoch):
 
-        mel = self.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
-        mel, mean, std = preprocess_spectrograms(mel)
-        mel = mel.unsqueeze(dim=1).to(self.device)  # mels: (bsz, 1, n_mels, frames)
-        assert mel.dim() == 4
+        mel = self.preprocess(audio)
 
         # filter_gen
         filter_z = torch.randn(mel.shape[0], self.filter_gen.noise_dim).to(self.device)
-        filtered = self.filter_gen(mel, filter_z, secret.long())
+        filtered_mel = self.filter_gen(mel.unsqueeze(dim=1), filter_z, secret.long())
 
         # secret_gen
         secret_z = torch.randn(mel.shape[0], self.secret_gen.noise_dim).to(self.device)
         fake_secret_male = torch.ones(mel.shape[0], requires_grad=False, dtype=torch.int64).to(self.device)
         fake_secret_female = torch.zeros(mel.shape[0], requires_grad=False, dtype=torch.int64).to(self.device)
-        fake_mel_male = self.secret_gen(filtered, secret_z, fake_secret_male)
-        fake_mel_female = self.secret_gen(filtered, secret_z, fake_secret_female)
+        fake_mel_male = self.secret_gen(filtered_mel, secret_z, fake_secret_male)
+        fake_mel_female = self.secret_gen(filtered_mel, secret_z, fake_secret_female)
 
         # predict label
         pred_label_male = torch.argmax(self.label_classifier(fake_mel_male).data, 1)
@@ -219,41 +245,15 @@ class WhisperPcgan:
         pred_secret_male = torch.argmax(self.secret_classifier(fake_mel_male).data, 1)
         pred_secret_female = torch.argmax(self.secret_classifier(fake_mel_female).data, 1)
 
-        unnormalized_filtered_mel = (torch.squeeze(filtered.cpu(), 1) * 3 * std + mean)
-        unnormalized_fake_mel_male = (torch.squeeze(fake_mel_male.cpu(), 1) * 3 * std + mean)
-        unnormalized_fake_mel_female = (torch.squeeze(fake_mel_female.cpu(), 1) * 3 * std + mean)
-        unnormalized_mel = torch.squeeze(mel.cpu() * 3 * std + mean)
+        audio, a2m2_audio, filtered_audio, audio_male, audio_female = self.postprocess(audio, mel, filtered_mel,
+                                                                                       fake_mel_male, fake_mel_female)
+        print(audio.shape, a2m2_audio.shape, filtered_audio.shape, audio_male.shape, audio_female.shape)
 
-        print(unnormalized_mel.shape, unnormalized_mel.squeeze().shape)
+        output = self._build_output_dict(id, label, epoch, pred_label_male, pred_label_female,
+                                         audio, filtered_audio, a2m2_audio, audio_male, audio_female)
 
-        a2m2a_audio = self.mel2audio(unnormalized_mel).squeeze()
-        filtered_audio = self.mel2audio(unnormalized_filtered_mel.squeeze()).squeeze()
-        audio_male = self.mel2audio(unnormalized_fake_mel_male.squeeze()).squeeze()
-        audio_female = self.mel2audio(unnormalized_fake_mel_female.squeeze()).squeeze()
-
-        print(audio.shape, a2m2a_audio.shape, filtered_audio.shape, audio_male.shape, audio_female.shape)
-        speaker_digit_str = f'speaker_{id.item()}_label_{label.item()}'
-        speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
-
-        def build_str(gnd, lbl): return speaker_digit_epoch_str + f'_sampled_gender_{gnd}_predicted_label_{lbl}.wav'
-
-        filtered_audio_file = speaker_digit_epoch_str + '_filtered.wav'
-        a2m2a_file = speaker_digit_epoch_str + '_a2m2a.wav'
-        male_audio_file = build_str('male', pred_label_male.item())
-        female_audio_file = build_str('female', pred_label_female.item())
-        original_audio_file = speaker_digit_str + '.wav'
-
-        return {original_audio_file: audio.squeeze().cpu(),
-                filtered_audio_file: filtered_audio,
-                a2m2a_file: a2m2a_audio,
-                male_audio_file: audio_male,
-                female_audio_file: audio_female}
-
-        # return {'mel': mel, 'filter_z': filter_z, 'filtered_spectrogram': filtered, 'secret_z': secret_z,
-        #         'fake_secret_male': fake_secret_male, 'fake_secret_female': fake_secret_female,
-        #         'fake_mel_male': fake_mel_male, 'fake_mel_female': fake_mel_female,
-        #         'pred_label_male': pred_label_male, 'pred_label_female': pred_label_female,
-        #         'pred_secret_male': pred_secret_male, 'pred_secret_female': pred_secret_female}
+        [print(v.shape) for k, v in output.items()]
+        return output
 
     def set_mode(self, mode):
         if mode == Mode.TRAIN:
@@ -283,3 +283,22 @@ class WhisperPcgan:
         for k, v in self.optimizers.items():
             torch.save(v.state_dict(), os.path.join(checkpoint_dir, f'optimizer_{k}_epoch_{epoch}.pt'))
             torch.save(v.state_dict(), os.path.join(checkpoint_dir, f'optimizer_{k}_latest_epoch_{epoch}.pt'))
+
+    def _build_output_dict(self, id, label, epoch, pred_label_male, pred_label_female,
+                           audio, filtered_audio, a2m2_audio, audio_male, audio_female):
+        speaker_digit_str = f'speaker_{id.item()}_label_{label.item()}'
+        speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
+
+        def build_str(gnd, lbl): return speaker_digit_epoch_str + f'_sampled_gender_{gnd}_predicted_label_{lbl}.wav'
+
+        filtered_audio_file = speaker_digit_epoch_str + '_filtered.wav'
+        a2m2a_file = speaker_digit_epoch_str + '_a2m2a.wav'
+        male_audio_file = build_str('male', pred_label_male.item())
+        female_audio_file = build_str('female', pred_label_female.item())
+        original_audio_file = speaker_digit_str + '.wav'
+
+        return {original_audio_file: audio,
+                filtered_audio_file: filtered_audio,
+                a2m2a_file: a2m2_audio,
+                male_audio_file: audio_male,
+                female_audio_file: audio_female}

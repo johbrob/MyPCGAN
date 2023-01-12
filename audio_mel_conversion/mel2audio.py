@@ -12,13 +12,13 @@ import torch
 
 
 class Mel2Audio:
-    def __init__(self, audio_mel_config):
-        self.n_fft = audio_mel_config.n_fft
-        self.sample_rate = audio_mel_config.sample_rate
-        self.hop_length = audio_mel_config.hop_length
-        self.win_length = audio_mel_config.win_length
-        self.n_mels = audio_mel_config.n_mels
-        self.center = audio_mel_config.center
+    def __init__(self, config):
+        self.n_fft = config.n_fft
+        self.sample_rate = config.sample_rate
+        self.hop_length = config.hop_length
+        self.win_length = config.win_length
+        self.n_mels = config.n_mels
+        self.center = config.center
 
     @abstractmethod
     def __call__(self, *args, **kwargs):
@@ -52,9 +52,13 @@ class LibRosaMel2Audio(Mel2Audio):
             return audio
 
 
-class CustomMel2Audio(Mel2Audio, nn.Module):
+class CustomMel2Audio(nn.Module):
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__()
+        self.input_size = config.input_size
+        self.ngf = config.ngf
+        self.n_residual_layers = config.n_residual_layers
+
         ratios = [8, 8, 2, 2]
         self.hop_length = np.prod(ratios)
         mult = int(2 ** len(ratios))

@@ -90,5 +90,10 @@ class WhisperAudio2Mel:
         shape = self.feature_extractor(audio, return_tensors="pt",
                                        sampling_rate=self.sampling_rate).input_features.shape
         return shape[1], shape[2]
-        # TODO: fix this so its not just hard coded
-        # return [80, 3000]
+
+    def not_padded_output_shape(self, audio):
+        if isinstance(audio, torch.Tensor):
+            audio = audio.squeeze().cpu().numpy()
+        shape = self.feature_extractor(audio, return_tensors="pt", padding=False,
+                                       sampling_rate=self.sampling_rate).input_features.shape
+        return shape[1], shape[2]

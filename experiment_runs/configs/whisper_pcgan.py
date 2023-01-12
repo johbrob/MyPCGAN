@@ -32,7 +32,7 @@ Q = [
                                                 pretrained_path=local_vars.CREMA_D_PRETRAINED_GENDER_CLASSIFIER_PATH),
             secret_classifier_config=ModelConfig(ResNet18, ResNetConfig(activation='relu'),
                                                  pretrained_path=local_vars.CREMA_D_PRETRAINED_EMOTION_CLASSIFIER_PATH),
-            whisper_config=WhisperEncoderConfig(WhisperSize.BASE, 16000),
+            whisper_config=WhisperEncoderConfig(WhisperSize.TINY, 16000),
             audio2mel_config=ModelConfig(WhisperAudio2Mel, AudioMelConfig()),
             mel2audio_config=ModelConfig(LibRosaMel2Audio, AudioMelConfig()),
             loss_config=LossConfig(filter_entropy_loss=True)
