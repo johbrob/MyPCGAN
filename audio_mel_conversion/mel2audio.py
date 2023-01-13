@@ -14,7 +14,7 @@ import torch
 class Mel2Audio:
     def __init__(self, config):
         self.n_fft = config.n_fft
-        self.sample_rate = config.sample_rate
+        self.sampling_rate = config.sampling_rate
         self.hop_length = config.hop_length
         self.win_length = config.win_length
         self.n_mels = config.n_mels
@@ -37,14 +37,13 @@ class LibRosaMel2Audio(Mel2Audio):
     def __init__(self, config):
         super().__init__(config)
 
-
     def __call__(self, mel):
         device = 'cpu'
         is_tensor = isinstance(mel, torch.Tensor)
         if is_tensor:
             device = mel.device
             mel = mel.cpu().numpy()
-        audio = mel_to_audio(M=mel, sr=self.sample_rate, n_fft=self.n_fft, hop_length=self.hop_length,
+        audio = mel_to_audio(M=mel, sr=self.sampling_rate, n_fft=self.n_fft, hop_length=self.hop_length,
                              win_length=self.win_length, center=False)
         if is_tensor:
             return torch.Tensor(audio).to(device)

@@ -19,15 +19,14 @@ def training_loop(train_loader, test_loader, training_config, architecture, devi
         architecture.set_mode(utils.Mode.TRAIN)
         step_counter = 0
         metrics = {}
-        for i, (data, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
-                                                          total=len(train_loader)):
-
+        for i, (audio, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
+                                                           total=len(train_loader)):
             # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
             step_counter += 1
             total_steps += 1
             labels, secrets = labels.to(device), secrets.to(device)
 
-            batch_metrics, losses = architecture.forward_pass(data, secrets, labels)
+            batch_metrics, losses = architecture.forward_pass(audio, secrets, labels)
             batch_metrics = utils.compile_metrics(batch_metrics)
             metrics = utils.aggregate_metrics(batch_metrics, metrics)
 
@@ -52,9 +51,9 @@ def training_loop(train_loader, test_loader, training_config, architecture, devi
                          test_loader, architecture, epoch, device, training_config.n_samples)
 
         if epoch % training_config.checkpoint_interval == 0:
-            utils.save_models_and_optimizers(
+            architecture.save(
                 utils.create_run_subdir(train_loader.dataset.get_name(), training_config.run_name, 'checkpoints'),
-                epoch, architecture)
+                epoch)
 
 
 def evaluate_on_dataset(data_loader, architecture, device):
@@ -63,7 +62,8 @@ def evaluate_on_dataset(data_loader, architecture, device):
     metrics = {}
 
     with torch.no_grad():
-        for i, (audio, secrets, labels, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation', total=len(data_loader)):
+        for i, (audio, secrets, labels, _, _) in tqdm.tqdm(enumerate(data_loader), 'Evaluation',
+                                                           total=len(data_loader)):
             # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
             labels, secrets = labels.to(device), secrets.to(device)
             # mels = audio_mel_converter.audio2mel(data).detach()  # spectrogram: (bsz, n_mels, frames)
@@ -84,7 +84,7 @@ def save_samples(example_dir, data_loader, architecture, epoch, device, n_sample
 
     with torch.no_grad():
         for i, (audio, secret, label, id, _) in tqdm.tqdm(enumerate(data_loader), 'Generating Samples',
-                                                         total=len(data_loader)):
+                                                          total=len(data_loader)):
             if i >= n_samples:
                 break
 

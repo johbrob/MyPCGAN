@@ -12,7 +12,7 @@ import torch
 class Audio2Mel:
     def __init__(self, audio_mel_config):
         self.n_fft = audio_mel_config.n_fft
-        self.sample_rate = audio_mel_config.sample_rate
+        self.sampling_rate = audio_mel_config.sampling_rate
         self.hop_length = audio_mel_config.hop_length
         self.win_length = audio_mel_config.win_length
         self.n_mels = audio_mel_config.n_mels
@@ -41,7 +41,7 @@ class LibRosaAudio2Mel(Audio2Mel):
             device = audio.device
             audio = audio.cpu().numpy()
 
-        mel = melspectrogram(y=audio, sr=self.sample_rate, n_fft=self.n_fft, hop_length=self.hop_length,
+        mel = melspectrogram(y=audio, sr=self.sampling_rate, n_fft=self.n_fft, hop_length=self.hop_length,
                              win_length=self.win_length, center=False, n_mels=self.n_mels)
         if is_tensor:
             return torch.Tensor(mel).to(device)
@@ -51,10 +51,13 @@ class LibRosaAudio2Mel(Audio2Mel):
 
 class LibRosaAudio2Mel2(Audio2Mel, torch.nn.Module):
     def __init__(self, config):
-        super().__init__(config)
+        # Audio2Mel.__init__(self, config)
+        # torch.nn.Module.__init__(self)
+        super().__init__(config)            # calls all parent classes up to Audio2Mel
+        super(Audio2Mel, self).__init__()   # calls all parent classes from Audio2Mel to torch.nn.Module
 
         window = torch.hann_window(config.win_length).float()
-        mel_basis = librosa_mel_fn(sr=config.sampling_rate, n_fft=config.n_fft, n_mels=config.n_mel_channels,
+        mel_basis = librosa_mel_fn(sr=config.sampling_rate, n_fft=config.n_fft, n_mels=config.n_mels,
                                    fmin=config.mel_fmin, fmax=config.mel_fmax)
         mel_basis = torch.from_numpy(mel_basis).float()
         self.register_buffer("mel_basis", mel_basis)

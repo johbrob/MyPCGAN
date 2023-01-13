@@ -25,5 +25,11 @@ class WhisperEncoder:
         self.sampling_rate = config.sampling_rate
         self.device = device
 
-    def __call__(self, data):
-        return self.whisper_encoder(data.to(self.device)).last_hidden_state
+    def __call__(self, data, *args, **kwargs):
+        if data.shape[0] == 1 and data.dim() == 3:
+            data = data.repeat(2, 1, 1)
+            output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state
+            output = output[0]
+        else:
+            output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state
+        return output

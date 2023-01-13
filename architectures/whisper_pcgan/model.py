@@ -1,6 +1,6 @@
 from architectures.utils import preprocess_spectrograms, create_model_from_config
-from architectures.pcgan.loss_computations import compute_losses, LossConfig
-from architectures.pcgan.metrics_computations import compute_metrics
+from architectures.whisper_pcgan.loss_computations import compute_losses, LossConfig
+from architectures.whisper_pcgan.metrics_computations import compute_metrics
 from neural_networks.whisper_encoder import WhisperEncoder
 from utils import Mode
 import torch
@@ -82,8 +82,8 @@ class WhisperPcgan:
         config.secret_gen.args.image_height = image_height
         config.secret_gen.args.n_classes = self.n_secrets
         config.secret_disc.args.n_classes = self.n_secrets + 1
-        config.label_classifier.args.n_classes = self.n_secrets
-        config.secret_classifier.args.n_classes = self.n_labels
+        # config.label_classifier.args.n_classes = self.n_secrets
+        # config.secret_classifier.args.n_classes = self.n_labels
 
         self.loss_funcs = {'filter_gen_distortion': torch.nn.L1Loss(), 'filter_gen_entropy': HLoss(),
                            'filter_gen_adversarial': torch.nn.CrossEntropyLoss(
@@ -150,30 +150,30 @@ class WhisperPcgan:
         return audio, a2m2_audio, filtered_audio, audio_male, audio_female
 
     def _filter_gen_forward_pass(self, mels, secrets):
-        mel_encodings = self.audio_encoder(mels.squeeze())
+        mel_encodings = self.audio_encoder(mels)
         filter_z = torch.randn(mels.shape[0], self.filter_gen.noise_dim).to(mels.device)
         filtered_mels = self.filter_gen(mels.unsqueeze(dim=1), filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
         filtered_secret_preds_gen = self.filter_disc(filtered_mels, frozen=True)  # (bsz, n_secret)
-        filtered_mel_encodings = self.audio_encoder(filtered_mels.squeeze())
+        filtered_mel_encodings = self.audio_encoder(filtered_mels.squeeze(dim=1))
         return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen,
                 'mel_encodings': mel_encodings, 'filtered_mel_encodings': filtered_mel_encodings}
 
     def _secret_gen_forward_pass(self, mels, filtered_mel):
         secret_z = torch.randn(mels.shape[0], self.secret_gen.noise_dim).to(mels.device)
         fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
-        fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
+        fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen) # (bsz, 1, n_mels, frames)
         fake_secret_preds_gen = self.secret_disc(fake_mel, frozen=True)  # (bsz, n_secrets + 1)
-        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze())
+        fake_mel_encodings = self.audio_encoder(fake_mel.squeeze(dim=1))
 
         secret_gen_output = {'fake_secret': fake_secret_gen, 'faked_mel': fake_mel,
-                             'fake_secret_score': fake_secret_preds_gen, 'fake_mel_encoding': fake_mel_encodings}
+                             'fake_secret_score': fake_secret_preds_gen, 'fake_mel_encodings': fake_mel_encodings}
 
         if self.generate_both_secrets:
             # (bsz, 1, n_mels, frames)
             alt_fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, 1 - fake_secret_gen, frozen=True)
             # (bsz, n_secrets + 1)
             alt_fake_secret_preds_gen = self.secret_disc(alt_fake_mel, frozen=True)
-            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze())
+            alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze(dim=1))
             secret_gen_output.update(
                 {'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen,
                  'alt_fake_mel_encoding': alt_fake_mel_encodings})
@@ -229,8 +229,8 @@ class WhisperPcgan:
         fake_mel_female = self.secret_gen(filtered_mel, secret_z, fake_secret_female)
 
         # secret disc
-        pred_label_male = self.secret_disc(fake_mel_male.detach().clone())
-        pred_label_female = self.secret_disc(fake_mel_female.detach().clone())
+        pred_label_male = torch.argmax(self.secret_disc(fake_mel_male.detach().clone()).data, 1)
+        pred_label_female = torch.argmax(self.secret_disc(fake_mel_female.detach().clone()).data, 1)
 
         audio, a2m2_audio, filtered_audio, audio_male, audio_female = self.postprocess(audio, mel, filtered_mel,
                                                                                        fake_mel_male, fake_mel_female)
@@ -275,6 +275,8 @@ class WhisperPcgan:
                            a2m2_audio, audio_male, audio_female):
         speaker_digit_str = f'speaker_{id.item()}_label_{label.item()}'
         speaker_digit_epoch_str = speaker_digit_str + f'_epoch_{epoch}'
+
+        print(pred_label_male.shape, pred_label_female.shape)
 
         def build_str(gnd, lbl): return speaker_digit_epoch_str + f'_sampled_gender_{gnd}_predicted_label_{lbl}.wav'
 
