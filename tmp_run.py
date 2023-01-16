@@ -68,15 +68,17 @@ def resample(samples, in_sr, out_sr):
     return torch.from_numpy(samples_new_sr)
 
 
-def save_audio_and_spectrogram(sample, audio2mel, mel2audio, path, file_name, sr, hop_length):
-    save_audio(sample, audio2mel, mel2audio, os.path.join(path, file_name + '.wav'), sr=sr)
+def save_audio_and_spectrogram(sample, audio2mel, mel2audio, path, file_name, sr, hop_length, cutoff=None):
+    save_audio(sample, audio2mel, mel2audio, os.path.join(path, file_name + '.wav'), sr=sr, cutoff=cutoff)
     save_mel_image(sample, audio2mel, os.path.join(path, file_name + '.png'), sr, hop_length)
+
 
 def convert_and_save(audio2mel, mel2audio, in_sr, out_sr, path, file_name, hop_length):
     sample = get_samples(in_sr, out_sr, 1)
     if in_sr != out_sr:
         sample = resample(sample, in_sr, out_sr)
     save_audio_and_spectrogram(sample, audio2mel, mel2audio, path, file_name, out_sr, hop_length)
+
 
 def like_melgan():
     pretrained_path1 = 'neural_networks/pretrained_weights/multi_speaker.pt'
@@ -130,9 +132,12 @@ def limits_of_melgan():
     save_audio_and_spectrogram(samples[2], fft_16000, mel2audio, path, 'like_melgan_16000_fft_16000_2', 16000, 256)
     # save audio with slightly too low sample rate and matching fft(22000)
     fft_22000 = Audio2Mel(n_mel_channels=80, sampling_rate=22000)
-    save_audio_and_spectrogram(samples_22000[0], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_0', 22000, 256)
-    save_audio_and_spectrogram(samples_22000[1], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_1', 22000, 256)
-    save_audio_and_spectrogram(samples_22000[2], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_2', 22000, 256)
+    save_audio_and_spectrogram(samples_22000[0], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_0', 22000,
+                               256)
+    save_audio_and_spectrogram(samples_22000[1], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_1', 22000,
+                               256)
+    save_audio_and_spectrogram(samples_22000[2], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_2', 22000,
+                               256)
     # save 22050 with fft(22050) with too low hop_length
     save_audio_and_spectrogram(samples_22050[0], fft, mel2audio, path, 'like_melgan_22050_200_0', 22050, 200)
     save_audio_and_spectrogram(samples_22050[1], fft, mel2audio, path, 'like_melgan_22050_200_1', 22050, 200)
@@ -147,9 +152,30 @@ def limits_of_melgan():
     save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_16000_1', 16000, 256)
     save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_16000_2', 16000, 256)
     # save audio using whisper audio2mel with original sample rate and hop length = 160
-    save_audio_and_spectrogram([samples[0]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_0', 16000, 160)
-    save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_1', 16000, 160)
-    save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_2', 16000, 160)
+    save_audio_and_spectrogram([samples[0]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_0',
+                               16000, 160)
+    save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_1',
+                               16000, 160)
+    save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_2',
+                               16000, 160)
+
+    librosa_mel2audio = LibRosaMel2Audio(AudioMelConfig(hop_length=160))
+    save_audio_and_spectrogram([samples[0]], whisper_audio2mel, librosa_mel2audio, path, 'whisper_librosa_0', 16000,
+                               160, 300)
+    save_audio_and_spectrogram([samples[1]], whisper_audio2mel, librosa_mel2audio, path, 'whisper_librosa_1', 16000,
+                               160, 300)
+    save_audio_and_spectrogram([samples[2]], whisper_audio2mel, librosa_mel2audio, path, 'whisper_librosa_2', 16000,
+                               160, 300)
+
+    save_audio_and_spectrogram([samples[0]], whisper_audio2mel, mel2audio, path, 'whisper_melgan_0', 16000, 160, 300)
+    save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_melgan_1', 16000, 160, 300)
+    save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_melgan_2', 16000, 160, 300)
+
+    new_fft = Audio2Mel(n_mel_channels=80, sampling_rate=22000)
+    librosa_mel2audio = LibRosaMel2Audio(AudioMelConfig())
+    save_audio_and_spectrogram(samples[0], fft, librosa_mel2audio, path, 'melgan_librosa_0', 16000, 256)
+    save_audio_and_spectrogram(samples[1], fft, librosa_mel2audio, path, 'melgan_librosa_1', 16000, 256)
+    save_audio_and_spectrogram(samples[2], fft, librosa_mel2audio, path, 'melgan_librosa_2', 16000, 256)
 
 def main():
     feature_size = 80
@@ -269,6 +295,7 @@ def stft():
 
     # stft are the same!
 
+
 def make_mels():
     import numpy as np
     from audio2mel_comparisons.Whisper import whisper_audio2mel
@@ -292,16 +319,49 @@ def make_mels():
     whisper_mels = whisper_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
     librosa1_mels = librosa1_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
 
-    librosa2_audio2mel = LibRosaAudio2Mel2(AudioMelConfig(n_fft, hop_length, win_length, n_mels, center, mel_fmin, mel_fmax))
+    librosa2_audio2mel = LibRosaAudio2Mel2(
+        AudioMelConfig(n_fft, hop_length, win_length, n_mels, center, mel_fmin, mel_fmax))
     librosa2_mels = librosa2_audio2mel(torch.from_numpy(sample))
     print(whisper_mels)
     print(librosa1_mels)
+
+
+def whisper_decoding():
+    from audio2mel_comparisons.Whisper import whisper_audio2mel
+    n_fft = 1024
+    hop_length = 256
+    win_length = 1024
+    n_mels = 80
+    center = False
+    mel_fmin = 0.0
+    mel_fmax = None
+    sampling_rate = 16000
+
+    train_data, test_data = CremaD.load(n_train_samples=10, n_test_samples=1)
+    sample = train_data[0][0]
+    sample = sample.detach().numpy()
+    whisper_mels = whisper_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
+    mel2audio = LibRosaMel2Audio(AudioMelConfig(n_fft=n_fft, hop_length=hop_length, win_length=win_length,
+                                                n_mels=n_mels, center=center))
+
+    whisper_audio = mel2audio(whisper_mels)
+    path = utils.create_run_subdir('just_a_test', '_i_say', 'whisper')
+    utils.save_audio_file(path + 'audio.wav', sampling_rate, torch.from_numpy(whisper_audio))
+    fig = plt.figure(figsize=(24, 24))  # This has to be changed!!
+    ax1 = fig.add_subplot(221)
+    p1 = librosa.display.specshow(whisper_mels, x_axis='time', y_axis='mel', sr=sampling_rate, fmax=4000,
+                                  hop_length=hop_length,
+                                  cmap='magma')
+    plt.title('sample_spectrogram', fontsize=20)
+    fig.savefig(path)
+    plt.close(fig)
 
 
 if __name__ == '__main__':
     # basic_test()
     # main()
     # like_melgan()
-    # limits_of_melgan()
+    limits_of_melgan()
     # stft()
-    make_mels()
+    # make_mels()
+    # whisper_decoding()
