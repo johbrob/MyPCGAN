@@ -72,11 +72,13 @@ def save_audio_and_spectrogram(sample, audio2mel, mel2audio, path, file_name, sr
     save_audio(sample, audio2mel, mel2audio, os.path.join(path, file_name + '.wav'), sr=sr)
     save_mel_image(sample, audio2mel, os.path.join(path, file_name + '.png'), sr, hop_length)
 
+
 def convert_and_save(audio2mel, mel2audio, in_sr, out_sr, path, file_name, hop_length):
     sample = get_samples(in_sr, out_sr, 1)
     if in_sr != out_sr:
         sample = resample(sample, in_sr, out_sr)
     save_audio_and_spectrogram(sample, audio2mel, mel2audio, path, file_name, out_sr, hop_length)
+
 
 def like_melgan():
     pretrained_path1 = 'neural_networks/pretrained_weights/multi_speaker.pt'
@@ -130,9 +132,12 @@ def limits_of_melgan():
     save_audio_and_spectrogram(samples[2], fft_16000, mel2audio, path, 'like_melgan_16000_fft_16000_2', 16000, 256)
     # save audio with slightly too low sample rate and matching fft(22000)
     fft_22000 = Audio2Mel(n_mel_channels=80, sampling_rate=22000)
-    save_audio_and_spectrogram(samples_22000[0], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_0', 22000, 256)
-    save_audio_and_spectrogram(samples_22000[1], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_1', 22000, 256)
-    save_audio_and_spectrogram(samples_22000[2], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_2', 22000, 256)
+    save_audio_and_spectrogram(samples_22000[0], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_0', 22000,
+                               256)
+    save_audio_and_spectrogram(samples_22000[1], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_1', 22000,
+                               256)
+    save_audio_and_spectrogram(samples_22000[2], fft_22000, mel2audio, path, 'like_melgan_22000_fft_22000_2', 22000,
+                               256)
     # save 22050 with fft(22050) with too low hop_length
     save_audio_and_spectrogram(samples_22050[0], fft, mel2audio, path, 'like_melgan_22050_200_0', 22050, 200)
     save_audio_and_spectrogram(samples_22050[1], fft, mel2audio, path, 'like_melgan_22050_200_1', 22050, 200)
@@ -147,9 +152,13 @@ def limits_of_melgan():
     save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_16000_1', 16000, 256)
     save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_16000_2', 16000, 256)
     # save audio using whisper audio2mel with original sample rate and hop length = 160
-    save_audio_and_spectrogram([samples[0]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_0', 16000, 160)
-    save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_1', 16000, 160)
-    save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_2', 16000, 160)
+    save_audio_and_spectrogram([samples[0]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_0',
+                               16000, 160)
+    save_audio_and_spectrogram([samples[1]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_1',
+                               16000, 160)
+    save_audio_and_spectrogram([samples[2]], whisper_audio2mel, mel2audio, path, 'whisper_16000_hop_length_160_2',
+                               16000, 160)
+
 
 def main():
     feature_size = 80
@@ -269,6 +278,7 @@ def stft():
 
     # stft are the same!
 
+
 def make_mels():
     import numpy as np
     from audio2mel_comparisons.Whisper import whisper_audio2mel
@@ -289,13 +299,55 @@ def make_mels():
     sample = train_data[0][0]
     sample = sample.detach().numpy()
 
-    whisper_mels = whisper_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
+    _, whisper_mels = whisper_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
     librosa1_mels = librosa1_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
 
-    librosa2_audio2mel = LibRosaAudio2Mel2(AudioMelConfig(n_fft, hop_length, win_length, n_mels, center, mel_fmin, mel_fmax))
-    librosa2_mels = librosa2_audio2mel(torch.from_numpy(sample))
+    librosa2_audio2mel = LibRosaAudio2Mel2(
+        AudioMelConfig(n_fft, hop_length, win_length, n_mels, center, mel_fmin, mel_fmax))
+    _, librosa2_mels = librosa2_audio2mel(torch.from_numpy(sample))
+
+    librosa2_mels = librosa2_mels.numpy()
     print(whisper_mels)
     print(librosa1_mels)
+    print(librosa2_mels)
+
+
+def compare_stft():
+    train_data, test_data = CremaD.load(n_train_samples=10, n_test_samples=1)
+    sample = train_data[0][0]
+    sample = sample.detach().numpy()
+
+    n_fft = 1024
+    hop_length = 256
+    win_length = 1024
+    n_mels = 80
+    center = False
+    mel_fmin = 0.0
+    mel_fmax = None
+    sampling_rate = 16000
+
+    from librosa.filters import get_window
+    from librosa.util import pad_center
+    from librosa.util import expand_to
+    fft_window = get_window('hann', win_length, fftbins=True)
+    # Pad the window out to n_fft size
+    fft_window = pad_center(fft_window, size=n_fft)
+    # Reshape so that the window can be broadcast
+    fft_window = expand_to(fft_window, ndim=1 + sample.ndim, axes=-2)
+    fft_window = torch.from_numpy(fft_window).squeeze()
+    fft_window = torch.hann_window(window_length=win_length)
+
+    librosa_stft = librosa.stft(y=sample, n_fft=2048, hop_length=hop_length, win_length=win_length,
+                                window="hann", center=False)
+    librosa2_stft = librosa.spectrum.stft(y=sample, n_fft=2048, hop_length=hop_length, win_length=win_length,
+                                window="hann", center=False)
+    torch_stft = torch.stft(torch.from_numpy(sample), n_fft=n_fft, hop_length=hop_length, win_length=win_length,
+                     window=fft_window, center=False, return_complex=True).numpy()
+    torch2_stft = torch.stft(torch.from_numpy(sample), n_fft=n_fft, hop_length=hop_length, win_length=win_length,
+                            window=fft_window, center=False, return_complex=True).numpy()
+
+
+    print(fft)
 
 
 if __name__ == '__main__':
@@ -304,4 +356,5 @@ if __name__ == '__main__':
     # like_melgan()
     # limits_of_melgan()
     # stft()
-    make_mels()
+    # make_mels()
+    compare_stft()

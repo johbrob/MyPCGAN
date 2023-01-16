@@ -136,7 +136,7 @@ def _np_extract_fbank_features(waveform: np.array, n_fft, sr, n_mels, hop_length
     log_spec = np.maximum(log_spec, log_spec.max() - 8.0)
     log_spec = (log_spec + 4.0) / 4.0
 
-    return log_spec
+    return log_spec, mel_spec
 
 
 def whisper_audio2mel(raw_speech, sampling_rate, n_fft, hop_length, center, n_mels):
@@ -146,6 +146,6 @@ def whisper_audio2mel(raw_speech, sampling_rate, n_fft, hop_length, center, n_me
     # waveform = raw_speech[0]
     #
     # input_features = [_np_extract_fbank_features(waveform, n_fft, sampling_rate, n_mels, hop_length, center)]
-    input_features = _np_extract_fbank_features(raw_speech, n_fft, sampling_rate, n_mels, hop_length, center)
+    input_features, mel_spec = _np_extract_fbank_features(raw_speech, n_fft, sampling_rate, n_mels, hop_length, center)
 
-    return input_features
+    return input_features, mel_spec
