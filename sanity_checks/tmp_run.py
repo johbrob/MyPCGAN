@@ -1,17 +1,18 @@
-import numpy as np
-
-from audio_mel_conversion import AudioMelConfig, CustomMel2Audio, LibRosaMel2Audio, LibRosaAudio2Mel, \
-    LibRosaAudio2Mel2
+from audio_mel_conversion import AudioMelConfig, MelGanMel2Audio, LibRosaMel2Audio, LibRosaAudio2Mel, \
+    MelGanAudio2Mel
 from audio_mel_conversion import WhisperAudio2Mel
 from neural_networks.whisper_encoder import WhisperSize
-from datasets import CremaD, AudioMNIST
+from datasets import CremaD
 import utils
 import torch
 import matplotlib.pyplot as plt
 import os
 import librosa.display
-from tmp_models import Audio2Mel, Generator
-from transformers import WhisperFeatureExtractor
+from sanity_checks.tmp_models import Audio2Mel, Generator
+import numpy as np
+from sanity_checks.audio2mel_comparisons.Whisper import from_wave
+from sanity_checks.audio2mel_comparisons.Whisper import whisper_audio2mel
+from sanity_checks.audio2mel_comparisons.LibRosa1 import librosa1_audio2mel
 
 
 # class WhisperAudio2Mel:
@@ -44,16 +45,21 @@ def save_mel_image(sample, audio2mel, path, sr, hop_length, cutoff=None):
 
 
 def save_audio(sample, audio2mel, mel2audio, path, sr, cutoff=None):
-    mel = audio2mel(sample).detach()
+    mel = audio2mel(sample)
+
+    if isinstance(mel, torch.Tensor):
+        mel = mel.detach().cpu()
 
     if cutoff:
         mel = mel[..., :cutoff]
 
-    audio = mel2audio(mel.squeeze().cpu())
+    audio = mel2audio(mel)
 
+    if isinstance(audio, torch.Tensor):
+        audio = audio.detach().squeeze()
     # if cutoff:
     #     audio = audio[..., :cutoff]
-    utils.save_audio_file(path, sr, audio.detach().squeeze())
+    utils.save_audio_file(path, sr, audio)
 
 
 def get_samples(n_samples):
@@ -177,6 +183,7 @@ def limits_of_melgan():
     save_audio_and_spectrogram(samples[1], fft, librosa_mel2audio, path, 'melgan_librosa_1', 16000, 256)
     save_audio_and_spectrogram(samples[2], fft, librosa_mel2audio, path, 'melgan_librosa_2', 16000, 256)
 
+
 def main():
     feature_size = 80
     sampling_rate = 16000
@@ -193,14 +200,14 @@ def main():
     # whisper_audio2mel = WhisperAudio2Mel(AudioMelConfig(WhisperSize=WhisperSize.TINY), chunk_length=chunk_length)
     whisper_audio2mel = WhisperAudio2Mel(AudioMelConfig(model_size=WhisperSize.TINY))
     librosa_audio2mel = LibRosaAudio2Mel(AudioMelConfig())
-    librosa2_audio2mel = LibRosaAudio2Mel2(AudioMelConfig())
+    librosa2_audio2mel = MelGanAudio2Mel(AudioMelConfig())
 
     librosa_mel2audio = LibRosaMel2Audio(AudioMelConfig(n_fft=n_fft, hop_length=hop_length, win_length=30))
 
-    melgan1 = CustomMel2Audio(AudioMelConfig(sampling_rate=sampling_rate))
+    melgan1 = MelGanMel2Audio(AudioMelConfig(sampling_rate=sampling_rate))
     melgan1.load_state_dict(torch.load(pretrained_path1, map_location=torch.device('cpu')))
 
-    melgan2 = CustomMel2Audio(AudioMelConfig(sampling_rate=sampling_rate))
+    melgan2 = MelGanMel2Audio(AudioMelConfig(sampling_rate=sampling_rate))
     melgan2.load_state_dict(torch.load(pretrained_path2, map_location=torch.device('cpu')))
 
     fft = Audio2Mel(n_mel_channels=80, sampling_rate=16000)
@@ -261,6 +268,8 @@ def basic_test():
 
 
 def stft():
+    from sanity_checks.audio2mel_comparisons.Whisper import stft_fun as stft_whisper
+    from sanity_checks.audio2mel_comparisons.LibRosa1 import stft_fun as stft_librosa1
     n_fft = 1024
     hop_length = 256
     win_length = 1024
@@ -275,13 +284,8 @@ def stft():
     sample = sample.detach().numpy()
     # sample = sample.unsqueeze(dim=0)
 
-    import numpy as np
-    from audio2mel_comparisons.Whisper import stft_fun as stft_whisper
-    from audio2mel_comparisons.Whisper import fram_wave
-    from audio2mel_comparisons.LibRosa1 import stft_fun as stft_librosa1
-
     window = np.hanning(n_fft + 1)[:-1]
-    frames = fram_wave(sample, n_fft, hop_length, center)
+    frames = from_wave(sample, n_fft, hop_length, center)
     stft_whisper = stft_whisper(frames, window=window, n_fft=n_fft)
     magnitudes = np.abs(stft_whisper[:, :-1]) ** 2
 
@@ -297,10 +301,6 @@ def stft():
 
 
 def make_mels():
-    import numpy as np
-    from audio2mel_comparisons.Whisper import whisper_audio2mel
-    from audio2mel_comparisons.LibRosa1 import librosa1_audio2mel
-
     n_fft = 1024
     hop_length = 256
     win_length = 1024
@@ -316,18 +316,70 @@ def make_mels():
     sample = train_data[0][0]
     sample = sample.detach().numpy()
 
-    whisper_mels = whisper_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
+    _, whisper_mels = whisper_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
     librosa1_mels = librosa1_audio2mel(sample, sampling_rate, n_fft, hop_length, center, n_mels)
 
-    librosa2_audio2mel = LibRosaAudio2Mel2(
+    librosa2_audio2mel = MelGanAudio2Mel(
         AudioMelConfig(n_fft, hop_length, win_length, n_mels, center, mel_fmin, mel_fmax))
-    librosa2_mels = librosa2_audio2mel(torch.from_numpy(sample))
+    _, librosa2_mels = librosa2_audio2mel(torch.from_numpy(sample))
+
+    librosa2_mels = librosa2_mels.numpy()
+
     print(whisper_mels)
     print(librosa1_mels)
+    print(librosa2_mels)
+
+    # continue transform
+    log_spec = np.log10(np.clip(whisper_mels, a_min=1e-10, a_max=None))
+    max_log_spec = log_spec.max()
+    log_spec_large = np.where(log_spec >= max_log_spec)
+    log_spec = np.maximum(log_spec, log_spec.max() - 8.0)
+    log_spec = (log_spec + 4.0) / 4.0
+
+    log_spec = log_spec * 4.0 - 4.0
+    log_spec = 10 ** log_spec
+
+
+
+def compare_stft():
+    train_data, test_data = CremaD.load(n_train_samples=10, n_test_samples=1)
+    sample = train_data[0][0]
+    sample = sample.detach().numpy()
+
+    n_fft = 1024
+    hop_length = 256
+    win_length = 1024
+    n_mels = 80
+    center = False
+    mel_fmin = 0.0
+    mel_fmax = None
+    sampling_rate = 16000
+
+    from librosa.filters import get_window
+    from librosa.util import pad_center
+    from librosa.util import expand_to
+    fft_window = get_window('hann', win_length, fftbins=True)
+    # Pad the window out to n_fft size
+    fft_window = pad_center(fft_window, size=n_fft)
+    # Reshape so that the window can be broadcast
+    fft_window = expand_to(fft_window, ndim=1 + sample.ndim, axes=-2)
+    fft_window = torch.from_numpy(fft_window).squeeze()
+    fft_window = torch.hann_window(window_length=win_length)
+
+    librosa_stft = librosa.stft(y=sample, n_fft=2048, hop_length=hop_length, win_length=win_length,
+                                window="hann", center=False)
+    librosa2_stft = librosa.spectrum.stft(y=sample, n_fft=2048, hop_length=hop_length, win_length=win_length,
+                                window="hann", center=False)
+    torch_stft = torch.stft(torch.from_numpy(sample), n_fft=n_fft, hop_length=hop_length, win_length=win_length,
+                     window=fft_window, center=False, return_complex=True).numpy()
+    torch2_stft = torch.stft(torch.from_numpy(sample), n_fft=n_fft, hop_length=hop_length, win_length=win_length,
+                            window=fft_window, center=False, return_complex=True).numpy()
+
+
+    print(torch_stft)
 
 
 def whisper_decoding():
-    from audio2mel_comparisons.Whisper import whisper_audio2mel
     n_fft = 1024
     hop_length = 256
     win_length = 1024
@@ -357,11 +409,48 @@ def whisper_decoding():
     plt.close(fig)
 
 
+def compare_melgan_version():
+    path = utils.create_run_subdir('just_a_test', 'melgan_comparisons', 'audio')
+    pretrained_path1 = 'neural_networks/pretrained_weights/multi_speaker.pt'
+    a2m1 = Audio2Mel(n_mel_channels=80, sampling_rate=22050)
+    m2a1 = Generator(80, 32, 3)
+    m2a1.load_state_dict(torch.load(pretrained_path1, map_location=torch.device('cpu')))
+
+    a2m2 = MelGanAudio2Mel(AudioMelConfig(sampling_rate=22050))
+    m2a2 = MelGanMel2Audio(AudioMelConfig(sampling_rate=22050))
+    m2a2.load_state_dict(torch.load(pretrained_path1, map_location=torch.device('cpu')))
+
+    samples = get_samples(3)
+
+    # save originals
+    utils.save_audio_file(os.path.join(path, 'original_0' + '.wav'), 16000, samples[0].detach().squeeze())
+    utils.save_audio_file(os.path.join(path, 'original_1' + '.wav'), 16000, samples[1].detach().squeeze())
+    utils.save_audio_file(os.path.join(path, 'original_2' + '.wav'), 16000, samples[2].detach().squeeze())
+
+    # save 22050 with fft(22050) how it should be
+    samples_22050 = resample(samples, 16000, 22050)
+    save_audio_and_spectrogram(samples_22050[0], a2m1, m2a1, path, 'melgan1_22050_0', 22050, 256)
+    save_audio_and_spectrogram(samples_22050[1], a2m1, m2a1, path, 'melgan1_22050_1', 22050, 256)
+    save_audio_and_spectrogram(samples_22050[2], a2m1, m2a1, path, 'melgan1_22050_2', 22050, 256)
+    save_audio_and_spectrogram(samples_22050[0], a2m2, m2a2, path, 'melgan2_22050_0', 22050, 256)
+    save_audio_and_spectrogram(samples_22050[1], a2m2, m2a2, path, 'melgan2_22050_1', 22050, 256)
+    save_audio_and_spectrogram(samples_22050[2], a2m2, m2a2, path, 'melgan2_22050_2', 22050, 256)
+
+    save_audio_and_spectrogram(samples[0], a2m1, m2a1, path, 'melgan1_16000_0', 16000, 256)
+    save_audio_and_spectrogram(samples[1], a2m1, m2a1, path, 'melgan1_16000_1', 16000, 256)
+    save_audio_and_spectrogram(samples[2], a2m1, m2a1, path, 'melgan1_16000_2', 16000, 256)
+    save_audio_and_spectrogram(samples[0], a2m2, m2a2, path, 'melgan2_16000_0', 16000, 256)
+    save_audio_and_spectrogram(samples[1], a2m2, m2a2, path, 'melgan2_16000_1', 16000, 256)
+    save_audio_and_spectrogram(samples[2], a2m2, m2a2, path, 'melgan2_16000_2', 16000, 256)
+
+
 if __name__ == '__main__':
     # basic_test()
     # main()
     # like_melgan()
-    limits_of_melgan()
+    # limits_of_melgan()
     # stft()
     # make_mels()
     # whisper_decoding()
+    # compare_stft()
+    compare_melgan_version()

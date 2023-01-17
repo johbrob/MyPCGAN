@@ -46,6 +46,18 @@ def parallel_whisper_experiment_wrapper(queue, experiment_setting, device):
     queue.put(device)
 
 
+def parallel_melgan_finetuning_experiment_wrapper(queue, experiment_setting, device):
+    from finetune_melgan import main
+    print("--------------------------------------------------------------------")
+    print(f" Start MelGan finetuning on '{experiment_setting['dataset'].name}' dataset "
+          f"with '{str(experiment_setting)}' setting on {device}")
+    print("--------------------------------------------------------------------")
+    main(settings=experiment_setting, device=device)
+
+    print("Finishing experiment on device {}".format(device))
+    queue.put(device)
+
+
 def parallel_experiment_queue(experiment, workers):
     queue = AVAILABLE_RUNS[experiment]
 

@@ -49,7 +49,7 @@ class LibRosaAudio2Mel(Audio2Mel):
             return mel
 
 
-class LibRosaAudio2Mel2(Audio2Mel, torch.nn.Module):
+class MelGanAudio2Mel(Audio2Mel, torch.nn.Module):
     def __init__(self, config):
         # Audio2Mel.__init__(self, config)
         # torch.nn.Module.__init__(self)
@@ -64,6 +64,10 @@ class LibRosaAudio2Mel2(Audio2Mel, torch.nn.Module):
         self.register_buffer("window", window)
 
     def __call__(self, audio: Union[torch.Tensor, np.ndarray]) -> Union[torch.Tensor, np.ndarray]:
+        # print('WARNING: NO PADDING IN LIBROSA AUDIO2MEL')
+        if audio.dim() == 1:
+            audio = audio.unsqueeze(dim=0)
+
         p = self._get_pad_length()
         audio = F.pad(audio, (p, p), "reflect")  # audio: bsz, seq_len
 
@@ -72,10 +76,14 @@ class LibRosaAudio2Mel2(Audio2Mel, torch.nn.Module):
         # frames = ceil((L - (window_length - 1) - 1) / hop_length)
         fft = torch.stft(audio, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length,
                          window=self.window, center=False, return_complex=True)
+        # tmp_window = self.window.numpy()
+        # tmp_stft = fft.numpy()
+        # tmp_abs_magnitude = np.abs(tmp_stft)
+        # tmp_square_abs_magnitude = tmp_abs_magnitude ** 2
         magnitude = torch.sqrt(fft.real ** 2 + fft.imag ** 2)
         mel_output = torch.matmul(self.mel_basis, magnitude)
         log_mel_spec = torch.log10(torch.clamp(mel_output, min=1e-5))
-        return log_mel_spec
+        return log_mel_spec#, mel_output
 
 
 class WhisperAudio2Mel:

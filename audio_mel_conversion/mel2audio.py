@@ -51,7 +51,7 @@ class LibRosaMel2Audio(Mel2Audio):
             return audio
 
 
-class CustomMel2Audio(nn.Module):
+class MelGanMel2Audio(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.input_size = config.input_size
