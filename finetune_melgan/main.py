@@ -131,7 +131,7 @@ def main(settings, device):
         test_audio.append(x_t)
 
         audio = x_t.squeeze().cpu()
-        utils.save_audio_file(save_path + ("original_%d.wav" % i), fft.sampling_rate, audio)
+        utils.save_audio_file(save_path + ("original_%d.wav" % i), fft.sampling_rate, audio, False)
         # writer.add_audio("original/sample_%d.wav" % i, audio, 0, sample_rate=22050)
 
         if i == settings.n_samples - 1:
@@ -222,8 +222,9 @@ def main(settings, device):
                 with torch.no_grad():
                     for i, (voc, _) in enumerate(zip(test_voc, test_audio)):
                         pred_audio = netG(voc)
+                        pred_audio = pred_audio[..., :x_t.shape[-1]]
                         pred_audio = pred_audio.squeeze().cpu()
-                        utils.save_audio_file(save_path + ("generated_%d.wav" % i), fft.sampling_rate, pred_audio)
+                        utils.save_audio_file(save_path + ("generated_%d.wav" % i), fft.sampling_rate, pred_audio, False)
                         # writer.add_audio(
                         #     "generated/sample_%d.wav" % i,
                         #     pred_audio,

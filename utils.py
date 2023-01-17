@@ -83,7 +83,7 @@ def unfreeze(model):
 # ----------- Saving Audio stuff -----------
 
 
-def save_audio_file(file_path, sampling_rate, audio):
+def save_audio_file(file_path, sampling_rate, audio, do_print=True):
     print(file_path, audio.shape)
 
     if isinstance(file_path, str):
