@@ -1,4 +1,5 @@
-from audio_mel_conversion import MelGanMel2Audio, MelGanAudio2Mel, AudioMelConfig
+from audio_mel_conversion import MelGanMel2Audio, MelGanAudio2Mel, AudioMelConfig, WhisperAudio2Mel, \
+    CustomWhisperAudio2Mel
 from finetune_melgan.discriminator import Discriminator
 from torch.utils.data import DataLoader
 from datasets import AvailableDatasets
@@ -10,19 +11,38 @@ import time
 import tqdm
 import log
 import numpy as np
+import GPUtil
+
+class DiscriminatorConfig:
+    def __init__(self, numD=3, ndf=16, n_layers=4, downsampling_factor=4, lambda_feat=10, cond_disc=True):
+        self.num_D = numD
+        self.ndf = ndf
+        self.n_layers = n_layers
+        self.downsampling_factor = downsampling_factor
+        self.lambda_feat = lambda_feat
+        self.cond_disc = cond_disc
+
 
 class FineTuneMelGanConfig:
-    def __init__(self, dataset=AvailableDatasets.CremaD, n_train_samples=None, n_test_samples=None,
-                 train_batch_size=128, test_batch_size=128, audio_mel=AudioMelConfig(), netG_lr=1e-4, netD_lr=1e-4,
-                 netG_betas=(0.5, 0.9), netD_betas=(0.5, 0.9), continue_training_from=False, epochs=1000):
+    def __init__(self, audio_mel, discriminator, dataset=AvailableDatasets.CremaD, n_train_samples=None,
+                 n_test_samples=None,
+                 train_batch_size=128, test_batch_size=128, netG_lr=1e-4, netD_lr=1e-4,
+                 netG_betas=(0.5, 0.9), netD_betas=(0.5, 0.9), continue_training_from=False, epochs=1000, do_log=True,
+                 train_num_workers=1, test_num_workers=1, do_train_shuffle=True, do_test_shuffle=True,
+                 updates_per_train_log_commit=10, save_interval=10, n_samples=5):
         self.dataset = dataset
         self.n_train_samples = n_train_samples
         self.n_test_samples = n_test_samples
         self.train_batch_size = train_batch_size
         self.test_batch_size = test_batch_size
+        self.train_num_workers = train_num_workers
+        self.test_num_workers = test_num_workers
+        self.do_train_shuffle = do_train_shuffle
+        self.do_test_shuffle = do_test_shuffle
 
         # audio_mel_arguments
         self.audio_mel = audio_mel
+        self.discriminator = discriminator
 
         self.netG_lr = netG_lr
         self.netD_lr = netD_lr
@@ -38,8 +58,16 @@ class FineTuneMelGanConfig:
         else:
             self.run_id = self.random_id()
 
+        self.do_log = do_log
+        self.updates_per_train_log_commit = updates_per_train_log_commit
+        self.save_interval = save_interval
+        self.n_samples = n_samples
+
     def random_id(self):
         return str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
+
+    def __str__(self):
+        return self.run_id.rsplit('_')[0]
 
 
 def initialize(settings):
@@ -63,7 +91,8 @@ def initialize(settings):
     netG = MelGanMel2Audio(settings.audio_mel)
     netD = Discriminator(settings.discriminator.num_D, settings.discriminator.ndf, settings.discriminator.n_layers,
                          settings.discriminator.downsampling_factor)
-    fft = MelGanAudio2Mel(settings.audio_mel)
+    # fft = MelGanAudio2Mel(settings.audio_mel)
+    fft = CustomWhisperAudio2Mel(settings.audio_mel)
 
     optG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
     optD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
@@ -75,6 +104,11 @@ def main(settings, device):
     train_loader, test_loader, netG, netD, fft, optG, optD = initialize(settings)
     print(netG)
     print(netD)
+    netG.to(device)
+    netD.to(device)
+
+    print(torch.cuda.memory_allocated(device)/ 10 ** 9, 'GB')
+    # print(torch.cuda.memory_summary(device=None, abbreviated=False))
 
     if settings.continue_training_from and settings.continue_training_from.exists():
         netG.load_state_dict(torch.load(settings.continue_training_from / "netG.pt"))
@@ -89,39 +123,43 @@ def main(settings, device):
     if settings.do_log:
         log.init(vars(settings), project='melgan_finetuning', run_name='run_1')
 
-        ##########################
-        # Dumping original audio #
-        ##########################
-        test_voc = []
-        test_audio = []
-        for i, x_t in enumerate(test_loader):
-            x_t = x_t.cuda()
-            s_t = fft(x_t).detach()
+    ##########################
+    # Dumping original audio #
+    ##########################
+    test_voc = []
+    test_audio = []
+    for i, (audio, _, _, _, _) in tqdm.tqdm(enumerate(test_loader), 'Save test samples', total=len(train_loader)):
+        x_t = audio.to(device)
+        s_t = fft(x_t).detach()
 
-            test_voc.append(s_t.cuda())
-            test_audio.append(x_t)
+        test_voc.append(s_t.to(device))
+        test_audio.append(x_t)
 
-            audio = x_t.squeeze().cpu()
-            utils.save_audio_file(save_path + ("original_%d.wav" % i), 22050, audio)
-            # writer.add_audio("original/sample_%d.wav" % i, audio, 0, sample_rate=22050)
+        audio = x_t.squeeze().cpu()
+        utils.save_audio_file(save_path + ("original_%d.wav" % i), 22050, audio)
+        # writer.add_audio("original/sample_%d.wav" % i, audio, 0, sample_rate=22050)
 
-            if i == settings.n_samples - 1:
-                break
+        if i == settings.n_samples - 1:
+            break
 
     costs = []
     start = time.time()
 
     # enable cudnn autotuner to speed up training
     torch.backends.cudnn.benchmark = True
-
+    # print(torch.cuda.memory_summary(device=None, abbreviated=False))
+    print(torch.cuda.memory_allocated(device)/ 10 ** 9, 'GB')
     best_mel_reconst = 1000000
     steps = 0
     for epoch in range(1, settings.epochs + 1):
-        for iterno, x_t in tqdm.tqdm(enumerate(train_loader), total=len(train_loader)):
-            x_t = x_t.cuda()
+        for iterno, (audio, _, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Training', total=len(train_loader)):
+            x_t = audio.to(device)
             s_t = fft(x_t).detach()
             print(s_t.shape)
-            x_pred_t = netG(s_t.cuda())
+            # print(torch.cuda.memory_summary(device=None, abbreviated=False))
+            print(torch.cuda.memory_allocated(device) / 10 ** 9, 'GB')
+            x_pred_t = netG(s_t.to(device))
+            x_pred_t = x_pred_t[..., :x_t.shape[-1]]
 
             with torch.no_grad():
                 s_pred_t = fft(x_pred_t.detach())
@@ -130,8 +168,8 @@ def main(settings, device):
             #######################
             # Train Discriminator #
             #######################
-            D_fake_det = netD(x_pred_t.cuda().detach())
-            D_real = netD(x_t.cuda())
+            D_fake_det = netD(x_pred_t.to(device).detach())
+            D_real = netD(x_t.unsqueeze(dim=1).to(device))
 
             loss_D = 0
             for scale in D_fake_det:
@@ -147,22 +185,22 @@ def main(settings, device):
             ###################
             # Train Generator #
             ###################
-            D_fake = netD(x_pred_t.cuda())
+            D_fake = netD(x_pred_t.to(device))
 
             loss_G = 0
             for scale in D_fake:
                 loss_G += -scale[-1].mean()
 
             loss_feat = 0
-            feat_weights = 4.0 / (settings.n_layers_D + 1)
-            D_weights = 1.0 / settings.num_D
+            feat_weights = 4.0 / (settings.discriminator.n_layers + 1)
+            D_weights = 1.0 / settings.discriminator.num_D
             wt = D_weights * feat_weights
-            for i in range(settings.num_D):
+            for i in range(settings.discriminator.num_D):
                 for j in range(len(D_fake[i]) - 1):
                     loss_feat += wt * F.l1_loss(D_fake[i][j], D_real[i][j].detach())
 
             netG.zero_grad()
-            (loss_G + settings.lambda_feat * loss_feat).backward()
+            (loss_G + settings.discriminator.lambda_feat * loss_feat).backward()
             optG.step()
 
             ######################
@@ -214,15 +252,15 @@ def main(settings, device):
                 print("Took %5.4fs to generate samples" % (time.time() - st))
                 print("-" * 100)
 
-            if steps % args.log_interval == 0:
-                print(
-                    "Epoch {} | Iters {} / {} | ms/batch {:5.2f} | loss {}".format(
-                        epoch,
-                        iterno,
-                        len(train_loader),
-                        1000 * (time.time() - start) / args.log_interval,
-                        np.asarray(costs).mean(0),
-                    )
-                )
-                costs = []
-                start = time.time()
+            # if steps % args.log_interval == 0:
+            #     print(
+            #         "Epoch {} | Iters {} / {} | ms/batch {:5.2f} | loss {}".format(
+            #             epoch,
+            #             iterno,
+            #             len(train_loader),
+            #             1000 * (time.time() - start) / args.log_interval,
+            #             np.asarray(costs).mean(0),
+            #         )
+            #     )
+            #     costs = []
+            #     start = time.time()

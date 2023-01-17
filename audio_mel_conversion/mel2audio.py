@@ -54,7 +54,7 @@ class LibRosaMel2Audio(Mel2Audio):
 class MelGanMel2Audio(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.input_size = config.input_size
+        self.n_mels = config.n_mels
         self.ngf = config.ngf
         self.n_residual_layers = config.n_residual_layers
 
@@ -62,7 +62,7 @@ class MelGanMel2Audio(nn.Module):
         self.hop_length = np.prod(ratios)
         mult = int(2 ** len(ratios))
 
-        model = [nn.ReflectionPad1d(3), WNConv1d(self.input_size, mult * self.ngf, kernel_size=7, padding=0)]
+        model = [nn.ReflectionPad1d(3), WNConv1d(self.n_mels, mult * self.ngf, kernel_size=7, padding=0)]
 
         # Upsample to raw audio scale
         for i, r in enumerate(ratios):

@@ -47,9 +47,9 @@ def parallel_whisper_experiment_wrapper(queue, experiment_setting, device):
 
 
 def parallel_melgan_finetuning_experiment_wrapper(queue, experiment_setting, device):
-    from finetune_melgan import main
+    from finetune_melgan.main import main
     print("--------------------------------------------------------------------")
-    print(f" Start MelGan finetuning on '{experiment_setting['dataset'].name}' dataset "
+    print(f" Start MelGan finetuning on '{experiment_setting.dataset.name}' dataset "
           f"with '{str(experiment_setting)}' setting on {device}")
     print("--------------------------------------------------------------------")
     main(settings=experiment_setting, device=device)
@@ -77,6 +77,8 @@ def parallel_experiment_queue(experiment, workers):
 
         if experiment == 'whisper':
             p = mp.Process(target=parallel_whisper_experiment_wrapper, args=(messageQueue, experiment_setting, device))
+        elif experiment == 'melgan_finetune':
+            p = mp.Process(target=parallel_melgan_finetuning_experiment_wrapper, args=(messageQueue, experiment_setting, device))
         else:
             p = mp.Process(target=parallel_experiment_wrapper, args=(messageQueue, experiment_setting, device))
 
@@ -104,7 +106,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'experiment': 'whisper-pcgan', 'gpus': [0]}
+    # args = {'experiment': 'whisper-pcgan', 'gpus': [0]}
+    args = {'experiment': 'melgan_finetune', 'gpus': [0]}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpus'] == [-1]:

@@ -15,7 +15,6 @@ class AudioMelConfig:
         self.sampling_rate = sampling_rate
 
         # for custom nn-mel2audio
-        self.input_size = n_mels
         self.ngf = ngf
         self.n_residual_layers = n_residual_layers
 

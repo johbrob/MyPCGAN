@@ -1,4 +1,6 @@
 import pandas
+from neural_networks.whisper_encoder import WhisperSize
+from transformers.models.whisper import WhisperFeatureExtractor
 from transformers import AutoFeatureExtractor
 from librosa.filters import mel as librosa_mel_fn
 from librosa.feature import melspectrogram
@@ -53,8 +55,8 @@ class MelGanAudio2Mel(Audio2Mel, torch.nn.Module):
     def __init__(self, config):
         # Audio2Mel.__init__(self, config)
         # torch.nn.Module.__init__(self)
-        super().__init__(config)            # calls all parent classes up to Audio2Mel
-        super(Audio2Mel, self).__init__()   # calls all parent classes from Audio2Mel to torch.nn.Module
+        super().__init__(config)  # calls all parent classes up to Audio2Mel
+        super(Audio2Mel, self).__init__()  # calls all parent classes from Audio2Mel to torch.nn.Module
 
         window = torch.hann_window(config.win_length).float()
         mel_basis = librosa_mel_fn(sr=config.sampling_rate, n_fft=config.n_fft, n_mels=config.n_mels,
@@ -83,7 +85,7 @@ class MelGanAudio2Mel(Audio2Mel, torch.nn.Module):
         magnitude = torch.sqrt(fft.real ** 2 + fft.imag ** 2)
         mel_output = torch.matmul(self.mel_basis, magnitude)
         log_mel_spec = torch.log10(torch.clamp(mel_output, min=1e-5))
-        return log_mel_spec#, mel_output
+        return log_mel_spec  # , mel_output
 
 
 class WhisperAudio2Mel:
@@ -108,3 +110,44 @@ class WhisperAudio2Mel:
         shape = self.feature_extractor(audio, return_tensors="pt", padding=False,
                                        sampling_rate=self.sampling_rate).input_features.shape
         return shape[1], shape[2]
+
+
+class CustomWhisperFeatureExtractor(WhisperFeatureExtractor):
+
+    def __init__(self):
+        super().__init__()
+
+    def _np_extract_fbank_features(self, waveform: np.array) -> np.ndarray:
+        """
+        Compute the log-Mel spectrogram of the provided audio, gives similar results whisper's original torch
+        implementation with 1e-5 tolerance.
+        """
+        window = np.hanning(self.n_fft + 1)[:-1]
+
+        frames = self.fram_wave(waveform)
+        stft = self.stft(frames, window=window)
+        magnitudes = np.abs(stft[:, :-1]) ** 2
+
+        filters = self.mel_filters
+        mel_spec = filters @ magnitudes
+
+        return mel_spec
+
+
+class CustomWhisperAudio2Mel(WhisperAudio2Mel):
+    def __init__(self, config):
+        self.feature_extractor = CustomWhisperFeatureExtractor()
+        self.sampling_rate = config.sampling_rate
+
+    def __call__(self, data):
+        data = [audio.squeeze().cpu().numpy() for audio in data]
+        return self.feature_extractor(data, return_tensors="pt", padding=False,
+                                      sampling_rate=self.sampling_rate).input_features
+
+
+    @staticmethod
+    def log_mels(mel):
+        log_spec = np.log10(np.clip(mel, a_min=1e-10, a_max=None))
+        log_spec = np.maximum(log_spec, log_spec.max() - 8.0)
+        log_spec = (log_spec + 4.0) / 4.0
+        return log_spec
