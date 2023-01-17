@@ -11,7 +11,6 @@ import time
 import tqdm
 import log
 import numpy as np
-import GPUtil
 
 class DiscriminatorConfig:
     def __init__(self, numD=3, ndf=16, n_layers=4, downsampling_factor=4, lambda_feat=10, cond_disc=True):
@@ -107,17 +106,13 @@ def main(settings, device):
     netG.to(device)
     netD.to(device)
 
-    print(torch.cuda.memory_allocated(device)/ 10 ** 9, 'GB')
-    # print(torch.cuda.memory_summary(device=None, abbreviated=False))
-
     if settings.continue_training_from and settings.continue_training_from.exists():
         netG.load_state_dict(torch.load(settings.continue_training_from / "netG.pt"))
         optG.load_state_dict(torch.load(settings.continue_training_from / "optG.pt"))
         netD.load_state_dict(torch.load(settings.continue_training_from / "netD.pt"))
         optD.load_state_dict(torch.load(settings.continue_training_from / "optD.pt"))
-        save_path = utils.create_run_subdir('finetune_melgan', settings.run_id, '')
-    else:
-        save_path = utils.create_run_subdir('finetune_melgan', settings.run_id, '')
+
+    save_path = utils.create_run_subdir('finetune_melgan', settings.run_id, '')
 
     # init wandb
     if settings.do_log:
@@ -136,7 +131,7 @@ def main(settings, device):
         test_audio.append(x_t)
 
         audio = x_t.squeeze().cpu()
-        utils.save_audio_file(save_path + ("original_%d.wav" % i), 22050, audio)
+        utils.save_audio_file(save_path + ("original_%d.wav" % i), fft.sampling_rate, audio)
         # writer.add_audio("original/sample_%d.wav" % i, audio, 0, sample_rate=22050)
 
         if i == settings.n_samples - 1:
@@ -147,17 +142,13 @@ def main(settings, device):
 
     # enable cudnn autotuner to speed up training
     torch.backends.cudnn.benchmark = True
-    # print(torch.cuda.memory_summary(device=None, abbreviated=False))
-    print(torch.cuda.memory_allocated(device)/ 10 ** 9, 'GB')
     best_mel_reconst = 1000000
     steps = 0
     for epoch in range(1, settings.epochs + 1):
         for iterno, (audio, _, _, _, _) in tqdm.tqdm(enumerate(train_loader), 'Training', total=len(train_loader)):
             x_t = audio.to(device)
             s_t = fft(x_t).detach()
-            print(s_t.shape)
-            # print(torch.cuda.memory_summary(device=None, abbreviated=False))
-            print(torch.cuda.memory_allocated(device) / 10 ** 9, 'GB')
+
             x_pred_t = netG(s_t.to(device))
             x_pred_t = x_pred_t[..., :x_t.shape[-1]]
 
@@ -211,11 +202,13 @@ def main(settings, device):
             do_log_train = steps % settings.updates_per_train_log_commit == 0
             if settings.do_log and do_log_train:
                 if do_log_train:
-                    metrics = {"loss/discriminator": costs[-1][0],
-                               "loss/generator": costs[-1][1],
-                               "loss/feature_matching": costs[-1][2],
-                               "loss/mel_reconstruction": costs[-1][3]}
+                    costs = np.asarray(costs).mean(0)
+                    metrics = {"loss/discriminator": costs[0],
+                               "loss/generator": costs[1],
+                               "loss/feature_matching": costs[2],
+                               "loss/mel_reconstruction": costs[3]}
                     log.metrics(metrics, steps, suffix='train', commit=False)
+                    costs = []
                 log.metrics({'Epoch': epoch + (i / len(train_loader))}, steps, commit=True)
 
             # writer.add_scalar("loss/discriminator", costs[-1][0], steps)
@@ -230,7 +223,7 @@ def main(settings, device):
                     for i, (voc, _) in enumerate(zip(test_voc, test_audio)):
                         pred_audio = netG(voc)
                         pred_audio = pred_audio.squeeze().cpu()
-                        utils.save_audio_file(save_path + ("generated_%d.wav" % i), 22050, pred_audio)
+                        utils.save_audio_file(save_path + ("generated_%d.wav" % i), fft.sampling_rate, pred_audio)
                         # writer.add_audio(
                         #     "generated/sample_%d.wav" % i,
                         #     pred_audio,
