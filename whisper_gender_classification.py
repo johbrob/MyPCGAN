@@ -10,6 +10,7 @@ import numpy as np
 import tqdm
 import enum
 import log
+import librosa
 
 
 class Aggregation(enum.Enum):
@@ -116,6 +117,7 @@ def main(settings=None, device=None):
     #     return whisper_encoder(input_features.to(device)).last_hidden_state
 
     def get_whisper_embeddings(data):
+        data = torch.from_numpy(librosa.resample(y=data.numpy(), orig_sr=16000, target_sr=22050))
         input_features = audio2mel(data)
         # input_features = [audio.numpy() for audio in data]
         # print(len(input_features), input_features[0].shape)
