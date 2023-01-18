@@ -66,7 +66,13 @@ class WhisperPcgan:
 
         self.audio2mel = config.audio2mel.model(config.audio2mel.args)
         self.mel2audio = config.mel2audio.model(config.mel2audio.args)
-        self.audio_encoder = WhisperEncoder(config.whisper, device)
+        if config.mel2audio.pretrained_path:
+            self.mel2audio.load_state_dict(
+                torch.load(config.mel2audio.pretrained_path, map_location=torch.device('cpu')))
+
+        self.audio_encoder = config.whisper.model(config.whisper.args, device)
+
+        # self.audio_encoder = WhisperEncoder(config.whisper, device)
         # self.audio2mel = create_model_from_config(config.audio2mel).to(device)
         # self.mel2audio = create_model_from_config(config.mel2audio).to(device)
 
@@ -161,7 +167,7 @@ class WhisperPcgan:
     def _secret_gen_forward_pass(self, mels, filtered_mel):
         secret_z = torch.randn(mels.shape[0], self.secret_gen.noise_dim).to(mels.device)
         fake_secret_gen = torch.randint(0, 1, mels.shape[0:1]).to(mels.device)  # (bsz,)
-        fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen) # (bsz, 1, n_mels, frames)
+        fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, fake_secret_gen)  # (bsz, 1, n_mels, frames)
         fake_secret_preds_gen = self.secret_disc(fake_mel, frozen=True)  # (bsz, n_secrets + 1)
         fake_mel_encodings = self.audio_encoder(fake_mel.squeeze(dim=1))
 

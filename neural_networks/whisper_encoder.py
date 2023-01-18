@@ -1,4 +1,5 @@
-from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoFeatureExtractor
+import torch.nn.functional
+from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, AutoFeatureExtractor, WhisperFeatureExtractor
 import enum
 
 
@@ -33,3 +34,29 @@ class WhisperEncoder:
         else:
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state
         return output
+
+class WhisperEncoderForMelGanMels(WhisperEncoder):
+    def __init__(self, config, device):
+        super().__init__(config, device)
+
+
+    def __call__(self, data, *args, **kwargs):
+        data = self._pad(data)
+        if data.shape[0] == 1 and data.dim() == 3:
+            data = data.repeat(2, 1, 1)
+            output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state
+            output = output[0]
+        else:
+            output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state
+        return output
+
+    def _pad(self, data):
+        lth = data.shape[-1]
+        p = 3000 - lth
+        output = torch.nn.functional.pad(data, (0, p), "constant", 0)
+        return output
+
+    def _preprocess(self, data):
+        log_spec = torch.maximum(data, data.amax() - 8.0)
+        log_spec = (log_spec + 4.0) / 4.0
+        return log_spec

@@ -85,7 +85,9 @@ class MelGanAudio2Mel(Audio2Mel, torch.nn.Module):
         magnitude = torch.sqrt(fft.real ** 2 + fft.imag ** 2)
         mel_output = torch.matmul(self.mel_basis, magnitude)
         log_mel_spec = torch.log10(torch.clamp(mel_output, min=1e-5))
-        return log_mel_spec  # , mel_output
+        return log_mel_spec
+        # print('WARNING: MELGAN-AUDIO2MEL outputs mel_output instead of log_mel_spec')
+        # return mel_output
 
 
 class WhisperAudio2Mel:
@@ -131,7 +133,11 @@ class CustomWhisperFeatureExtractor(WhisperFeatureExtractor):
         filters = self.mel_filters
         mel_spec = filters @ magnitudes
 
+        log_spec = np.log10(np.clip(mel_spec, a_min=1e-10, a_max=None))
+
+        print('WARNING: CustomWhisper-Audio2Mel returns mel_spec instead of log_spec')
         return mel_spec
+        # return log_spec
 
 
 class CustomWhisperAudio2Mel(WhisperAudio2Mel):
@@ -140,10 +146,12 @@ class CustomWhisperAudio2Mel(WhisperAudio2Mel):
         self.sampling_rate = config.sampling_rate
 
     def __call__(self, data):
+        if data.dim() == 1:
+            data = data.unsqueeze(dim=0)
         data = [audio.squeeze().cpu().numpy() for audio in data]
-        return self.feature_extractor(data, return_tensors="pt", padding=False,
-                                      sampling_rate=self.sampling_rate).input_features
-
+        mel_spec = self.feature_extractor(data, return_tensors="pt", padding=False,
+                                                    sampling_rate=self.sampling_rate).input_features
+        return mel_spec
 
     @staticmethod
     def log_mels(mel):

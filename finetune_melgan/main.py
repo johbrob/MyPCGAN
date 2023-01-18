@@ -11,6 +11,55 @@ import time
 import tqdm
 import log
 import numpy as np
+import enum
+from itertools import chain
+
+
+class Converter(enum.Enum):
+    CUT_FIRST = 0
+    CUT_LAST = 1
+    MLP = 2
+
+
+class GeneratorWrapper(torch.nn.Module):
+    def __init__(self, config, converter, original_length, current_length):
+        super().__init__()
+        assert original_length is not None and original_length > 0
+        assert current_length is not None and current_length > 0
+        self.netG = MelGanMel2Audio(config)
+        self.converter_func = self.init_converter_func(converter, original_length, current_length)
+        self.converter = converter
+
+    def __call__(self, x, *args, **kwargs):
+        output = self.netG(x)
+        output = self.converter_func(output)
+        return output
+
+    def init_converter_func(self, converter, original_length, current_length):
+        if converter is Converter.CUT_FIRST:
+            diff = current_length - original_length
+            def func(x):
+                return x[..., diff:]
+            return func
+        elif converter is Converter.CUT_LAST:
+            def func(x):
+                return x[..., :original_length]
+
+            return func
+        elif converter is Converter.MLP:
+            return torch.nn.Sequential(
+                torch.nn.Linear(current_length, current_length),
+                torch.nn.ReLU(inplace=True),
+                torch.nn.Dropout(),
+                torch.nn.Linear(current_length, original_length)
+            )
+
+    # def parameters(self):
+    #     if self.converter is Converter.CUT:
+    #         return self.netG.parameters()
+    #     elif self.converter is Converter.MLP:
+    #         return chain(self.netG.parameters(), self.converter.parameters())
+
 
 class DiscriminatorConfig:
     def __init__(self, numD=3, ndf=16, n_layers=4, downsampling_factor=4, lambda_feat=10, cond_disc=True):
@@ -28,7 +77,8 @@ class FineTuneMelGanConfig:
                  train_batch_size=128, test_batch_size=128, netG_lr=1e-4, netD_lr=1e-4,
                  netG_betas=(0.5, 0.9), netD_betas=(0.5, 0.9), continue_training_from=False, epochs=1000, do_log=True,
                  train_num_workers=1, test_num_workers=1, do_train_shuffle=True, do_test_shuffle=True,
-                 updates_per_train_log_commit=10, save_interval=10, n_samples=5):
+                 updates_per_train_log_commit=10, save_interval=1000, n_samples=5, pretrained_path=None,
+                 converter=Converter.CUT_LAST):
         self.dataset = dataset
         self.n_train_samples = n_train_samples
         self.n_test_samples = n_test_samples
@@ -62,6 +112,10 @@ class FineTuneMelGanConfig:
         self.save_interval = save_interval
         self.n_samples = n_samples
 
+        self.pretrained_path = pretrained_path
+
+        self.converter = converter
+
     def random_id(self):
         return str(np.random.randint(0, 9, 7))[1:-1].replace(' ', '')
 
@@ -87,7 +141,10 @@ def initialize(settings):
     test_loader = DataLoader(dataset=test_data, batch_size=settings.test_batch_size,
                              num_workers=settings.test_num_workers, shuffle=settings.do_test_shuffle)
 
-    netG = MelGanMel2Audio(settings.audio_mel)
+    # netG = MelGanMel2Audio(settings.audio_mel)
+    netG = GeneratorWrapper(settings.audio_mel, settings.converter, 40000, 64000)
+    if settings.pretrained_path:
+        netG.netG.load_state_dict(torch.load(settings.pretrained_path, map_location=torch.device('cpu')))
     netD = Discriminator(settings.discriminator.num_D, settings.discriminator.ndf, settings.discriminator.n_layers,
                          settings.discriminator.downsampling_factor)
     # fft = MelGanAudio2Mel(settings.audio_mel)
@@ -107,7 +164,9 @@ def main(settings, device):
     netD.to(device)
 
     if settings.continue_training_from and settings.continue_training_from.exists():
-        netG.load_state_dict(torch.load(settings.continue_training_from / "netG.pt"))
+        netG.netG.load_state_dict(torch.load(settings.continue_training_from / "netG.pt"))
+        if settings.converter is Converter.MLP:
+            netG.converter.load_state_dict(torch.load(settings.continue_training_from / "converter.pt"))
         optG.load_state_dict(torch.load(settings.continue_training_from / "optG.pt"))
         netD.load_state_dict(torch.load(settings.continue_training_from / "netD.pt"))
         optD.load_state_dict(torch.load(settings.continue_training_from / "optD.pt"))
@@ -116,7 +175,7 @@ def main(settings, device):
 
     # init wandb
     if settings.do_log:
-        log.init(vars(settings), project='melgan_finetuning', run_name='run_1')
+        log.init(vars(settings), project='melgan_finetuning', run_name=f'run_{settings.run_id}')
 
     ##########################
     # Dumping original audio #
@@ -150,7 +209,7 @@ def main(settings, device):
             s_t = fft(x_t).detach()
 
             x_pred_t = netG(s_t.to(device))
-            x_pred_t = x_pred_t[..., :x_t.shape[-1]]
+            # x_pred_t = x_pred_t[..., :x_t.shape[-1]]
 
             with torch.no_grad():
                 s_pred_t = fft(x_pred_t.detach())
@@ -222,9 +281,10 @@ def main(settings, device):
                 with torch.no_grad():
                     for i, (voc, _) in enumerate(zip(test_voc, test_audio)):
                         pred_audio = netG(voc)
-                        pred_audio = pred_audio[..., :x_t.shape[-1]]
+                        # pred_audio = pred_audio[..., :x_t.shape[-1]]
                         pred_audio = pred_audio.squeeze().cpu()
-                        utils.save_audio_file(save_path + ("generated_%d.wav" % i), fft.sampling_rate, pred_audio, False)
+                        utils.save_audio_file(save_path + ("generated_%d.wav" % i), fft.sampling_rate, pred_audio,
+                                              False)
                         # writer.add_audio(
                         #     "generated/sample_%d.wav" % i,
                         #     pred_audio,
@@ -232,7 +292,9 @@ def main(settings, device):
                         #     sample_rate=22050,
                         # )
 
-                torch.save(netG.state_dict(), save_path + "netG.pt")
+                torch.save(netG.netG.state_dict(), save_path + "netG.pt")
+                if settings.converter is Converter.MLP:
+                    torch.save(netG.converter.state_dict(), save_path + "converter.pt")
                 torch.save(optG.state_dict(), save_path + "optG.pt")
 
                 torch.save(netD.state_dict(), save_path + "netD.pt")

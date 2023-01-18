@@ -133,19 +133,37 @@ def _np_extract_fbank_features(waveform: np.array, n_fft, sr, n_mels, hop_length
     mel_spec = filters @ magnitudes
 
     log_spec = np.log10(np.clip(mel_spec, a_min=1e-10, a_max=None))
+    pre_final_conversions = log_spec
     log_spec = np.maximum(log_spec, log_spec.max() - 8.0)
     log_spec = (log_spec + 4.0) / 4.0
 
-    return log_spec, mel_spec
+    return log_spec, mel_spec, pre_final_conversions
 
 
 def whisper_audio2mel(raw_speech, sampling_rate, n_fft, hop_length, center, n_mels):
-
     # raw_speech = [np.asarray([speech], dtype=np.float32).T for speech in raw_speech]
     # raw_speech = np.expand_dims(raw_speech, axis=0)
     # waveform = raw_speech[0]
     #
     # input_features = [_np_extract_fbank_features(waveform, n_fft, sampling_rate, n_mels, hop_length, center)]
-    input_features, mel_spec = _np_extract_fbank_features(raw_speech, n_fft, sampling_rate, n_mels, hop_length, center)
+    input_features, mel_spec, pre_final_conversions = _np_extract_fbank_features(raw_speech, n_fft, sampling_rate,
+                                                                                 n_mels, hop_length, center)
 
-    return input_features, mel_spec
+    return input_features, mel_spec, pre_final_conversions
+
+
+def get_components(waveform: np.array, n_fft, sr, n_mels, hop_length, center) -> np.ndarray:
+    """
+    Compute the log-Mel spectrogram of the provided audio, gives similar results whisper's original torch
+    implementation with 1e-5 tolerance.
+    """
+    window = np.hanning(n_fft + 1)[:-1]
+    frames = from_wave(waveform, n_fft, hop_length, center)
+    stft = stft_fun(frames, window=window, n_fft=n_fft)
+    magnitudes_pre_squared = np.abs(stft[:, :-1])
+    magnitudes = np.abs(stft[:, :-1]) ** 2
+
+    filters = get_mel_filters(sr, n_fft, n_mels)
+    mel_spec = filters @ magnitudes
+
+    return window, frames, stft, magnitudes_pre_squared, filters, mel_spec

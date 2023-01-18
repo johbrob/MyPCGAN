@@ -1,6 +1,5 @@
-from audio_mel_conversion import AudioMelConfig, MelGanMel2Audio, LibRosaMel2Audio, LibRosaAudio2Mel, \
-    MelGanAudio2Mel
-from audio_mel_conversion import WhisperAudio2Mel
+from audio_mel_conversion import AudioMelConfig, LibRosaMel2Audio, MelGanMel2Audio, LibRosaAudio2Mel, \
+    MelGanAudio2Mel, CustomWhisperAudio2Mel, WhisperAudio2Mel
 from neural_networks.whisper_encoder import WhisperSize
 from datasets import CremaD
 import utils
@@ -31,6 +30,8 @@ def save_mel_image(sample, audio2mel, path, sr, hop_length, cutoff=None):
     mel = audio2mel(sample).detach()
     mel = mel.squeeze().cpu().numpy()
 
+    print(np.amax(mel))
+    print(np.amin(mel))
     if cutoff:
         mel = mel[..., :cutoff]
 
@@ -376,6 +377,12 @@ def compare_stft():
                             window=fft_window, center=False, return_complex=True).numpy()
 
 
+    fig = plt.figure(figsize=(24, 24))  # This has to be changed!!
+    ax1 = fig.add_subplot(221)
+    plt.imshow(librosa_stft, cmap=None, interpolation='nearest')
+    plt.title('sample_spectrogram', fontsize=20)
+    fig.savefig(path)
+    plt.close(fig)
     print(torch_stft)
 
 
@@ -444,12 +451,63 @@ def compare_melgan_version():
     save_audio_and_spectrogram(samples[2], a2m2, m2a2, path, 'melgan2_16000_2', 16000, 256)
 
 
+def whisper_as_melgan():
+    path = utils.create_run_subdir('just_a_test', 'whisper_as_melgan', 'audio')
+    pretrained_path1 = 'neural_networks/pretrained_weights/multi_speaker.pt'
+    config = AudioMelConfig(sampling_rate=16000, hop_length=160)
+    a2m_melgan = MelGanAudio2Mel(config)
+    m2a = MelGanMel2Audio(config)
+    m2a.load_state_dict(torch.load(pretrained_path1, map_location=torch.device('cpu')))
+    a2m_whisper = CustomWhisperAudio2Mel(config)
+
+    samples = get_samples(3)
+
+    melgan_mel = a2m_melgan(samples[0])
+    whisper_mel = a2m_whisper(samples[0])
+
+    print('melgan', torch.amax(melgan_mel), torch.amin(melgan_mel))
+    print('whisper', torch.amax(whisper_mel), torch.amin(whisper_mel))
+
+    def save(mel, sr, path, m2a):
+        if isinstance(mel, torch.Tensor):
+            mel = mel.detach().cpu()
+        audio = m2a(mel)
+        if isinstance(audio, torch.Tensor):
+            audio = audio.detach().squeeze()
+        utils.save_audio_file(path, sr, audio)
+
+
+    # # save originals
+    # utils.save_audio_file(os.path.join(path, 'original_0' + '.wav'), 16000, samples[0].detach().squeeze())
+    # utils.save_audio_file(os.path.join(path, 'original_1' + '.wav'), 16000, samples[1].detach().squeeze())
+    # utils.save_audio_file(os.path.join(path, 'original_2' + '.wav'), 16000, samples[2].detach().squeeze())
+    #
+    # save_audio_and_spectrogram(samples[0], a2m_melgan, m2a, path, 'melgan_0', 16000, 160)
+    # save_audio_and_spectrogram(samples[1], a2m_melgan, m2a, path, 'melgan_1', 16000, 160)
+    # save_audio_and_spectrogram(samples[2], a2m_melgan, m2a, path, 'melgan_2', 16000, 160)
+    #
+    # save_audio_and_spectrogram(samples[0, :], a2m_whisper, m2a, path, 'whisper_0', 16000, 160)
+    # save_audio_and_spectrogram(samples[1, :], a2m_whisper, m2a, path, 'whisper_1', 16000, 160)
+    # save_audio_and_spectrogram(samples[2, :], a2m_whisper, m2a, path, 'whisper_2', 16000, 160)
+    #
+    # save_audio_and_spectrogram(samples[0, :], a2m_whisper, m2a, path, 'whisper_22050_256_0', 22050, 256)
+    # save_audio_and_spectrogram(samples[1, :], a2m_whisper, m2a, path, 'whisper_22050_2561', 22050, 256)
+    # save_audio_and_spectrogram(samples[2, :], a2m_whisper, m2a, path, 'whisper_22050_256_2', 22050, 256)
+    #
+    # a2m_melgan2 = MelGanAudio2Mel(AudioMelConfig(sampling_rate=22050, hop_length=256))
+    # samples_22050 = resample(samples, 16000, 22050)
+    # save_audio_and_spectrogram(samples_22050[0], a2m_melgan2, m2a, path, 'melgan_22050_256_0', 22050, 256)
+    # save_audio_and_spectrogram(samples_22050[1], a2m_melgan2, m2a, path, 'melgan_22050_256_1', 22050, 256)
+    # save_audio_and_spectrogram(samples_22050[2], a2m_melgan2, m2a, path, 'melgan_22050_256_2', 22050, 256)
+
+
+
 if __name__ == '__main__':
     # basic_test()
     # main()
     # like_melgan()
     # limits_of_melgan()
-    # stft()
+    stft()
     # make_mels()
     # whisper_decoding()
     # compare_stft()

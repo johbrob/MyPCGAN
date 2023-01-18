@@ -106,8 +106,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    # args = {'experiment': 'whisper-pcgan', 'gpus': [0]}
-    args = {'experiment': 'melgan_finetune', 'gpus': [0]}
+    args = {'experiment': 'whisper-pcgan', 'gpus': [-1]}
+    # args = {'experiment': 'melgan_finetune', 'gpus': [0]}
     verify_args(args)
 
     if not torch.cuda.is_available() or args['gpus'] == [-1]:
