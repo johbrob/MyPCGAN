@@ -1,3 +1,4 @@
+from audio_mel_conversion import MelGanAudio2Mel, AudioMelConfig
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from datasets import CremaD, get_dataset
 from torch.utils.data import DataLoader
@@ -56,6 +57,14 @@ def compute_accuracy(preds, labels):
     preds = torch.argmax(preds, 1).cpu().numpy()
     return np.array(accuracy_score(labels.cpu().numpy(), preds))
 
+
+def _pad(data):
+    lth = data.shape[-1]
+    p = 3000 - lth
+    output = torch.nn.functional.pad(data, (0, p), "constant", 0)
+    return output
+
+
 def main(settings=None, device=None):
     if settings is None:
         settings = {'batch_size': 16, 'num_workers': 2, 'sampling_rate': 16000, 'epochs': 10,
@@ -67,8 +76,7 @@ def main(settings=None, device=None):
             device = 'cuda:0'
         else:
             device = 'cpu'
-
-    print('load whisper...')
+    audio2mel = MelGanAudio2Mel(AudioMelConfig())
     processor = AutoProcessor.from_pretrained("openai/whisper-small")
     whisper_encoder = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-small").get_encoder().to(device)
     whisper_encoder._freeze_parameters()
@@ -99,13 +107,25 @@ def main(settings=None, device=None):
         log.init(settings, project='whisper_gender_classification',
                  run_name=f"{settings['aggregation'].name}_bsz_{settings['batch_size']}_epochs_{settings['epochs']}_lr_{settings['lr']}")
 
+    # def get_whisper_embeddings(data):
+    #     input_features = [audio.numpy() for audio in data]
+    #     print(len(input_features), input_features[0].shape)
+    #     input_features = processor(input_features, return_tensors="pt",
+    #                                sampling_rate=settings['sampling_rate']).input_features
+    #     print(input_features.shape)
+    #     return whisper_encoder(input_features.to(device)).last_hidden_state
+
     def get_whisper_embeddings(data):
-        input_features = [audio.numpy() for audio in data]
-        print(len(input_features), input_features[0].shape)
-        input_features = processor(input_features, return_tensors="pt",
-                                   sampling_rate=settings['sampling_rate']).input_features
-        print(input_features.shape)
-        return whisper_encoder(input_features.to(device)).last_hidden_state
+        input_features = audio2mel(data)
+        # input_features = [audio.numpy() for audio in data]
+        # print(len(input_features), input_features[0].shape)
+        # input_features = processor(input_features, return_tensors="pt",
+        #                            sampling_rate=settings['sampling_rate']).input_features
+        input_features = _pad(input_features)
+        log_spec = torch.maximum(input_features, input_features.max() - 8.0)
+        log_spec = (log_spec + 4.0) / 4.0
+        print(log_spec.shape)
+        return whisper_encoder(log_spec.to(device)).last_hidden_state
 
     model.train()
     optimizer.zero_grad()

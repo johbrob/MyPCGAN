@@ -67,7 +67,7 @@ class MelGanAudio2Mel(Audio2Mel, torch.nn.Module):
 
     def __call__(self, audio: Union[torch.Tensor, np.ndarray]) -> Union[torch.Tensor, np.ndarray]:
         # print('WARNING: NO PADDING IN LIBROSA AUDIO2MEL')
-        if audio.dim() == 1:
+        if isinstance(audio, torch.Tensor) and audio.dim() == 1:
             audio = audio.unsqueeze(dim=0)
 
         p = self._get_pad_length()

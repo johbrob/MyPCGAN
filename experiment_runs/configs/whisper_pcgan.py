@@ -21,9 +21,9 @@ Q = [
     ExperimentSetup(
         training_config=TrainingConfig(
             run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000,
-            train_batch_size=4, test_batch_size=4, do_log=True, deterministic=False,
+            train_batch_size=16, test_batch_size=16, do_log=True, deterministic=False,
             gradient_accumulation=4, save_interval=10, checkpoint_interval=10,
-            updates_per_train_log_commit=10, updates_per_evaluation=50, test_num_workers=0,
+            updates_per_train_log_commit=10, updates_per_evaluation=200, test_num_workers=0,
             # n_train_samples=128, n_test_samples=64
         ),
         architecture_config=WhistperPcganConfig(

@@ -1,5 +1,6 @@
 # from training.utils import preprocess_spectrograms
 # from training.sampling import save_test_samples, generate_samples
+import librosa
 import numpy as np
 import torch
 import utils
@@ -22,6 +23,7 @@ def training_loop(train_loader, test_loader, training_config, architecture, devi
         for i, (audio, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                            total=len(train_loader)):
             # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
+            # audio = torch.from_numpy(librosa.resample(y=audio.numpy(), orig_sr=16000, target_sr=22050))
             step_counter += 1
             total_steps += 1
             labels, secrets = labels.to(device), secrets.to(device)
