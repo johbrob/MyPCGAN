@@ -4,7 +4,8 @@ import torch
 
 
 def _compute_filter_gen_metrics(losses):
-    return {'distortion_loss': losses['filter_gen']['distortion'].detach().cpu().numpy(),
+    return {'raw_distortion': losses['filter_gen']['raw_distortion'].detach().cpu().numpy(),
+            'distortion_loss': losses['filter_gen']['distortion'].detach().cpu().numpy(),
             'adversarial_loss': losses['filter_gen']['adversarial'].detach().cpu().numpy(),
             'combined_loss': losses['filter_gen']['final'].detach().cpu().numpy()}
 
