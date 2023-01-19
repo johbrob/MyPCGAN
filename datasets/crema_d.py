@@ -63,7 +63,7 @@ class CremaD(AudioDataset):
 
     @staticmethod
     def get_default_sampling_rate() -> int:
-        return 16000
+        return 22050
 
     @staticmethod
     def get_default_segment_length() -> int:

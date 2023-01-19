@@ -133,7 +133,7 @@ class WhisperPcgan:
         return output
 
     def preprocess(self, audio):
-        audio = torch.from_numpy(librosa.resample(y=audio.numpy(), orig_sr=16000, target_sr=22050))
+        # audio = torch.from_numpy(librosa.resample(y=audio.numpy(), orig_sr=16000, target_sr=22050))
         # audio = self.pad(audio, 57500)
         mels = self.audio2mel(audio).detach()  # mels: (bsz, n_mels, frames)
         mels, self.means, self.stds = preprocess_spectrograms(mels)
@@ -154,9 +154,9 @@ class WhisperPcgan:
 
         if self.stds and self.means:
             mel = mel.cpu() * 3 * self.stds + self.means
-            filtered_mel = filtered_mel.cpu() * 3 * self.stds + self.means
-            fake_mel_male = fake_mel_male.cpu() * 3 * self.stds + self.means
-            fake_mel_female = fake_mel_female.cpu() * 3 * self.stds + self.means
+            filtered_mel = (filtered_mel.cpu() * 3 * self.stds) + self.means
+            fake_mel_male = (fake_mel_male.cpu() * 3 * self.stds) + self.means
+            fake_mel_female = (fake_mel_female.cpu() * 3 * self.stds) + self.means
 
         audio = audio.squeeze().cpu()
         a2m2_audio = self.mel2audio(mel.squeeze().cpu())
@@ -170,10 +170,11 @@ class WhisperPcgan:
         audio_female = audio_female.squeeze()
 
         # resample back to original sample_rate
-        a2m2_audio = torch.from_numpy(librosa.resample(y=a2m2_audio.numpy(), orig_sr=22050, target_sr=16000))
-        filtered_audio = torch.from_numpy(librosa.resample(y=filtered_audio.numpy(), orig_sr=22050, target_sr=16000))
-        audio_male = torch.from_numpy(librosa.resample(y=audio_male.numpy(), orig_sr=22050, target_sr=16000))
-        audio_female = torch.from_numpy(librosa.resample(y=audio_female.numpy(), orig_sr=22050, target_sr=16000))
+        # filtered_audio = a2m2_audio.clone()
+        # a2m2_audio = torch.from_numpy(librosa.resample(y=a2m2_audio.numpy(), orig_sr=22050, target_sr=16000))
+        # filtered_audio = torch.from_numpy(librosa.resample(y=filtered_audio.numpy(), orig_sr=22050, target_sr=16000))
+        # audio_male = torch.from_numpy(librosa.resample(y=audio_male.numpy(), orig_sr=22050, target_sr=16000))
+        # audio_female = torch.from_numpy(librosa.resample(y=audio_female.numpy(), orig_sr=22050, target_sr=16000))
 
         print(audio.shape, a2m2_audio.shape, filtered_audio.shape, audio_male.shape, audio_female.shape)
         # if a2m2_audio.shape[-1] > audio.shape[-1]:

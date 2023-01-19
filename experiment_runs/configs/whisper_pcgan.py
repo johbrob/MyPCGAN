@@ -32,7 +32,7 @@ Q = [
             secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
             secret_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
             whisper_config=ModelConfig(WhisperEncoderForMelGanMels, WhisperEncoderConfig(WhisperSize.TINY, 16000)),
-            audio2mel_config=ModelConfig(MelGanAudio2Mel, AudioMelConfig()),
+            audio2mel_config=ModelConfig(MelGanAudio2Mel, AudioMelConfig(sampling_rate=22050)),
             mel2audio_config=ModelConfig(MelGanMel2Audio, AudioMelConfig(),
                                          pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
             loss_config=LossConfig(filter_entropy_loss=True)
