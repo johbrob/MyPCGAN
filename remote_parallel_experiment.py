@@ -106,7 +106,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = vars(args)
 
-    args = {'experiment': 'whisper-pcgan', 'gpus': [-1]}
+    # args = {'experiment': 'whisper-pcgan', 'gpus': [-1]}
+    args = {'experiment': 'filter-wgan', 'gpus': [0]}
     # args = {'experiment': 'melgan_finetune', 'gpus': [0]}
     # args = {'experiment': 'whisper', 'gpus': [-1]}
     verify_args(args)

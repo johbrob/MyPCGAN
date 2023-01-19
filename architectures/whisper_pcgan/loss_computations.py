@@ -19,12 +19,12 @@ def _compute_filter_gen_loss(loss_funcs, spectrograms, secret, filter_gen_output
     distortion_loss = loss_funcs['filter_gen_distortion'](filter_gen_output['filtered_mel_encodings'],
                                                           filter_gen_output['mel_encodings'])
     if loss_config.filter_entropy_loss or True:
-        adversary_loss = loss_funcs['filter_gen_entropy'](filter_gen_output['filtered_secret_score'])
+        adversary_loss = -loss_funcs['filter_gen_entropy'](filter_gen_output['filtered_secret_score'])
     else:
         adversary_loss = loss_funcs['filter_gen_adversarial'](filter_gen_output['filtered_secret_score'], target.long())
 
-    final_loss = adversary_loss + \
-                 loss_config.filter_gamma * torch.pow(torch.relu(distortion_loss - loss_config.filter_epsilon), 2)
+    distortion_loss = loss_config.filter_gamma * torch.pow(torch.relu(distortion_loss - loss_config.filter_epsilon), 2)
+    final_loss = adversary_loss + distortion_loss
 
     return {'distortion': distortion_loss, 'adversarial': adversary_loss, 'final': final_loss}
 
