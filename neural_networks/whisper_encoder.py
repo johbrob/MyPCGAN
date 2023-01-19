@@ -41,7 +41,10 @@ class WhisperEncoderForMelGanMels(WhisperEncoder):
 
 
     def __call__(self, data, *args, **kwargs):
+
         data = self._pad(data)
+        data = self._preprocess(data)
+
         if data.shape[0] == 1 and data.dim() == 3:
             data = data.repeat(2, 1, 1)
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state

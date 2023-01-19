@@ -126,7 +126,7 @@ def main(settings=None, device=None):
         input_features = _pad(input_features)
         log_spec = torch.maximum(input_features, input_features.max() - 8.0)
         log_spec = (log_spec + 4.0) / 4.0
-        print(log_spec.shape)
+        # print(log_spec.shape)
         return whisper_encoder(log_spec.to(device)).last_hidden_state
 
     model.train()

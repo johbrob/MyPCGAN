@@ -13,6 +13,10 @@ import os
 def training_loop(train_loader, test_loader, training_config, architecture, device):
     utils.zero_grad(architecture.optimizers)
     total_steps = 0
+
+    save_samples(utils.create_run_subdir(test_loader.dataset.get_name(), training_config.run_name, 'samples'),
+                 test_loader, architecture, 0, device, training_config.n_samples)
+
     for epoch in range(0, training_config.epochs):
         epoch = epoch + 1
         epoch_start = time.time()
@@ -23,7 +27,6 @@ def training_loop(train_loader, test_loader, training_config, architecture, devi
         for i, (audio, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                            total=len(train_loader)):
             # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
-            # audio = torch.from_numpy(librosa.resample(y=audio.numpy(), orig_sr=16000, target_sr=22050))
             step_counter += 1
             total_steps += 1
             labels, secrets = labels.to(device), secrets.to(device)
