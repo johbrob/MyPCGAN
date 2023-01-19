@@ -34,7 +34,9 @@ def _compute_filter_disc_loss(secret, filter_disc_output):
 
     unfiltered_errD_male = torch.mean(filter_disc_output['unfiltered_secret_score'][(secret == 1), 0])
     unfiltered_errD_female = torch.mean(filter_disc_output['unfiltered_secret_score'][(secret == 0), 0])
-    unfiltered_errD = -unfiltered_errD_female + unfiltered_errD_male
+
+    lambda_gp = 10
+    unfiltered_errD = -unfiltered_errD_female + unfiltered_errD_male + lambda_gp * filter_disc_output['gradient_penalty']
     return {'final': errD, 'male_filtered_loss': errD_male, 'female_filtered_loss': errD_female,
             'unfiltered_final': unfiltered_errD,
             'male_unfiltered_loss': unfiltered_errD_male, 'female_unfiltered_loss': unfiltered_errD_female}
