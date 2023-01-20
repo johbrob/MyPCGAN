@@ -191,10 +191,20 @@ class WhisperPcgan:
 
     def _filter_gen_forward_pass(self, mels, secrets):
         mel_encodings = self.audio_encoder(mels)
+        print('audio_encoder')
+        GPUtil.showUtilization()
         filter_z = torch.randn(mels.shape[0], self.filter_gen.noise_dim).to(mels.device)
+        print('torch.randn')
+        GPUtil.showUtilization()
         filtered_mels = self.filter_gen(mels.unsqueeze(dim=1), filter_z, secrets.long())  # (bsz, 1, n_mels, frames)
+        print('filter_gen forward')
+        GPUtil.showUtilization()
         filtered_secret_preds_gen = self.filter_disc(filtered_mels, frozen=True)  # (bsz, n_secret)
+        print('filter disc forward')
+        GPUtil.showUtilization()
         filtered_mel_encodings = self.audio_encoder(filtered_mels.squeeze(dim=1))
+        print('filtered audio_encoder')
+        GPUtil.showUtilization()
         return {'filtered_mel': filtered_mels, 'filtered_secret_score': filtered_secret_preds_gen,
                 'mel_encodings': mel_encodings, 'filtered_mel_encodings': filtered_mel_encodings}
 
