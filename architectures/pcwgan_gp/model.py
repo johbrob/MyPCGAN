@@ -92,12 +92,12 @@ class WhisperPcgan:
         # config.label_classifier.args.n_classes = self.n_secrets
         # config.secret_classifier.args.n_classes = self.n_labels
 
-        self.loss_funcs = {'filter_gen_distortion': config.loss.filter_dist_loss(), 'filter_gen_entropy': HLoss(),
+        self.loss_funcs = {'filter_gen_distortion': torch.nn.L1Loss(), 'filter_gen_entropy': HLoss(),
                            'filter_gen_adversarial': torch.nn.CrossEntropyLoss(
                                label_smoothing=config.filter_gen_label_smoothing),
                            'filter_disc': torch.nn.CrossEntropyLoss(
                                label_smoothing=config.filter_disc_label_smoothing),
-                           'secret_gen_distortion': config.loss.filter_dist_loss(), 'secret_gen_entropy': HLoss(),
+                           'secret_gen_distortion': torch.nn.L1Loss(), 'secret_gen_entropy': HLoss(),
                            'secret_gen_adversarial': torch.nn.CrossEntropyLoss(
                                label_smoothing=config.secret_gen_label_smoothing),
                            'secret_disc': torch.nn.CrossEntropyLoss(
@@ -117,8 +117,6 @@ class WhisperPcgan:
             'secret_gen': torch.optim.Adam(self.secret_gen.parameters(), self.lr['secret_gen'], betas['secret_gen']),
             'secret_disc': torch.optim.Adam(self.secret_disc.parameters(), self.lr['secret_disc'], betas['secret_disc'])
         }
-        self.disc_optimizers = {key:self.optimizers[key] for key in ['filter_disc', 'secret_disc']}
-        self.gen_optimizers = {key: self.optimizers[key] for key in ['filter_gen', 'secret_gen']}
 
         self.loss_config = config.loss
         self.generate_both_secrets = config.generate_both_secrets
@@ -210,14 +208,13 @@ class WhisperPcgan:
 
         if self.generate_both_secrets:
             # (bsz, 1, n_mels, frames)
-            alt_fake_secret_gen = 1 - fake_secret_gen
-            alt_fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, alt_fake_secret_gen, frozen=True)
+            alt_fake_mel = self.secret_gen(filtered_mel.detach(), secret_z, 1 - fake_secret_gen, frozen=True)
             # (bsz, n_secrets + 1)
             alt_fake_secret_preds_gen = self.secret_disc(alt_fake_mel, frozen=True)
             alt_fake_mel_encodings = self.audio_encoder(alt_fake_mel.squeeze(dim=1))
             secret_gen_output.update(
-                {'alt_fake_secret': alt_fake_secret_gen, 'alt_faked_mel': alt_fake_mel,
-                 'alt_fake_secret_score': alt_fake_secret_preds_gen, 'alt_fake_mel_encodings': alt_fake_mel_encodings})
+                {'alt_faked_mel': alt_fake_mel, 'alt_fake_secret_score': alt_fake_secret_preds_gen,
+                 'alt_fake_mel_encoding': alt_fake_mel_encodings})
 
         return secret_gen_output
 

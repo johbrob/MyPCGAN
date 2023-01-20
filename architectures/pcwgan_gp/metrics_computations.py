@@ -1,0 +1,100 @@
+from sklearn.metrics import accuracy_score
+import numpy as np
+import torch
+
+
+def _compute_filter_gen_metrics(losses):
+    return {'raw_distortion': losses['filter_gen']['raw_distortion'].detach().cpu().numpy(),
+            'distortion_loss': losses['filter_gen']['distortion'].detach().cpu().numpy(),
+            'adversarial_loss': losses['filter_gen']['adversarial'].detach().cpu().numpy(),
+            'combined_loss': losses['filter_gen']['final'].detach().cpu().numpy()}
+
+
+def _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels):
+    # fake_mel/alt_fake_mel: (bsz, 1, n_mels, frames))
+
+    all_fake_mel = torch.stack((secret_gen_output['faked_mel'], secret_gen_output['alt_faked_mel']), dim=1)
+    male_mels = torch.stack(
+        [fake_mel[1 - fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
+    female_mels = torch.stack(
+        [fake_mel[fake_secret] for fake_mel, fake_secret in zip(all_fake_mel, secret_gen_output['fake_secret'])])
+
+    all_fake_scores = torch.stack((secret_gen_output['fake_secret_score'], secret_gen_output['alt_fake_secret_score']),
+                                  dim=1)
+    male_scores = torch.stack([fake_scores[1 - fake_secret] for fake_scores, fake_secret in
+                               zip(all_fake_scores, secret_gen_output['fake_secret'])])
+    female_scores = torch.stack([fake_scores[fake_secret] for fake_scores, fake_secret in
+                                 zip(all_fake_scores, secret_gen_output['fake_secret'])])
+
+    male_female_diff = loss_funcs['secret_gen_distortion'](male_mels, female_mels)
+    male_distortion = loss_funcs['secret_gen_distortion'](male_mels, mels.unsqueeze(dim=1))
+    female_distortion = loss_funcs['secret_gen_distortion'](female_mels, mels.unsqueeze(dim=1))
+    male_adversarial = loss_funcs['secret_gen_adversarial'](male_scores, secret_gen_output['fake_secret'])
+    female_adversarial = loss_funcs['secret_gen_adversarial'](female_scores, secret_gen_output['fake_secret'])
+
+    return {'distortion_loss': losses['secret_gen']['distortion'].detach().cpu().numpy(),
+            'adversarial_loss': losses['secret_gen']['adversarial'].detach().cpu().numpy(),
+            'combined_loss': losses['secret_gen']['final'].detach().cpu().numpy(),
+
+            'male_distortion': male_distortion.detach().cpu().numpy(),
+            'female_distortion': female_distortion.detach().cpu().numpy(),
+            'male_adversarial': male_adversarial.detach().cpu().numpy(),
+            'female_adversarial': female_adversarial.detach().cpu().numpy(),
+            # 'male_final': male_final.detach().cpu().numpy(),
+            # 'female_final': female_final.detach().cpu().numpy(),
+            'male_female_diff': male_female_diff.detach().cpu().numpy(),
+            }
+
+
+def _compute_filter_disc_metrics(losses, filter_disc_output, secret):
+    filtered_secret_preds_disc = torch.argmax(filter_disc_output['filtered_secret_score'], 1).cpu().numpy()
+    filtered_secret_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), filtered_secret_preds_disc))
+
+    unfiltered_secret_preds_disc = torch.argmax(filter_disc_output['unfiltered_secret_score'], 1).cpu().numpy()
+    unfiltered_secret_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), unfiltered_secret_preds_disc))
+    return {'filtered_loss': losses['filter_disc']['final'].detach().cpu().numpy(),
+            'filtered_accuracy': filtered_secret_accuracy_disc,
+            'unfiltered_loss': losses['filter_disc']['unfiltered_score_loss'].detach().cpu().numpy(),
+            'unfiltered_accuracy': unfiltered_secret_accuracy_disc}
+
+
+def _compute_secret_disc_metrics(losses, secret_disc_output, secret_gen_output, secret):
+    fake_secret_preds_disc = torch.argmax(secret_disc_output['fake_secret_score'], 1).cpu().numpy()
+    fake_secret_label_accuracy_disc = np.array(accuracy_score(secret_disc_output['fake_secret'].cpu().numpy(),
+                                                              fake_secret_preds_disc))
+    real_secret_preds_disc = torch.argmax(secret_disc_output['real_secret_score'], 1).cpu().numpy()
+    real_secret_label_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), real_secret_preds_disc))
+    generated_secret_accuracy_disc = np.array(accuracy_score(secret_gen_output['fake_secret'].cpu().numpy(),
+                                                             fake_secret_preds_disc))
+
+    return {'real_loss': losses['secret_disc']['real'].detach().cpu().numpy(),
+            'fake_loss': losses['secret_disc']['fake'].detach().cpu().numpy(),
+            'combined_loss': losses['secret_disc']['final'].detach().cpu().numpy(),
+            'fake_accuracy': fake_secret_label_accuracy_disc,
+            'real_accuracy': real_secret_label_accuracy_disc,
+            'generated_accuracy': generated_secret_accuracy_disc}
+
+
+def compute_metrics(mels, secret, label, filter_gen_output, filter_disc_output, secret_gen_output,
+                    secret_disc_output, losses, loss_funcs):
+    filter_gen_metrics = _compute_filter_gen_metrics(losses)
+    secret_gen_metrics = _compute_secret_gen_metrics(losses, loss_funcs, secret_gen_output, mels)
+    filter_disc_metrics = _compute_filter_disc_metrics(losses, filter_disc_output, secret)
+    secret_disc_metrics = _compute_secret_disc_metrics(losses, secret_disc_output, secret_gen_output, secret)
+
+    # label prediction
+    # label_preds_disc = torch.argmax(secret_disc_output['label_score'].data, 1).cpu().numpy()
+    # label_accuracy_disc = np.array(accuracy_score(label.cpu().numpy(), label_preds_disc))
+    # label_prediction_metrics = {'accuracy': label_accuracy_disc}
+
+    # secret_preds_disc = torch.argmax(secret_disc_output['secret_score'].data, 1).cpu().numpy()
+    # real_secret_accuracy_disc = np.array(accuracy_score(secret.cpu().numpy(), secret_preds_disc))
+    # fake_secret_accuracy_disc = np.array(
+    #     accuracy_score(secret_gen_output['fake_secret'].cpu().numpy(), secret_preds_disc))
+    # secret_prediction_metrics = {'real_secret_accuracy': real_secret_accuracy_disc,
+    #                              'fake_secret_accuracy': fake_secret_accuracy_disc}
+
+    return {'filter_gen': filter_gen_metrics, 'secret_gen': secret_gen_metrics,
+            'filter_disc': filter_disc_metrics, 'secret_disc': secret_disc_metrics,
+            # 'label_classifier': label_prediction_metrics, 'secret_classifier': secret_prediction_metrics
+            }

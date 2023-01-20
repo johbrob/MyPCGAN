@@ -1,6 +1,7 @@
 # from training.utils import preprocess_spectrograms
 # from training.sampling import save_test_samples, generate_samples
 import librosa
+from optimizer_updating import OptimizerUpdater
 import numpy as np
 import torch
 import utils
@@ -13,6 +14,8 @@ import os
 def training_loop(train_loader, test_loader, training_config, architecture, device):
     utils.zero_grad(architecture.optimizers)
     total_steps = 0
+    optimizer_updater = OptimizerUpdater(training_config.disc_graident_accumulation, training_config.gen_gradient_accumulation,
+                                         architecture.disc_optimizers, architecture.gen_optimizers)
 
     save_samples(utils.create_run_subdir(test_loader.dataset.get_name(), training_config.run_name, 'samples'),
                  test_loader, architecture, 0, device, training_config.n_samples)
@@ -45,10 +48,11 @@ def training_loop(train_loader, test_loader, training_config, architecture, devi
                     log.metrics(metrics, total_steps, suffix='train', commit=False)
                 log.metrics({'Epoch': epoch + (i / len(train_loader))}, total_steps, commit=True)
 
-            if total_steps % training_config.gradient_accumulation == 0:
-                utils.backward(losses)
-                utils.step(architecture.optimizers)
-                utils.zero_grad(architecture.optimizers)
+            optimizer_updater.step(total_steps, losses)
+            # if total_steps % training_config.gradient_accumulation == 0:
+            #     utils.backward(losses)
+            #     utils.step(architecture.optimizers)
+            #     utils.zero_grad(architecture.optimizers)
 
         if epoch % training_config.save_interval == 0:
             print("Saving data and mels samples.")

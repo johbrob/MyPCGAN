@@ -17,8 +17,8 @@ class TrainingConfig:
     def __init__(self, run_name='tmp', dataset=AvailableDatasets.CremaD, train_batch_size=128, test_batch_size=128,
                  do_train_shuffle=True, do_test_shuffle=True, train_num_workers=2, test_num_workers=2, save_interval=5,
                  checkpoint_interval=1, updates_per_evaluation=50, updates_per_train_log_commit=10,
-                 gradient_accumulation=1, epochs=2, n_samples=1, do_log=True, librosa_audio_mel=False,
-                 deterministic=False, n_train_samples=None, n_test_samples=None):
+                 disc_gradient_accumulation=1, gen_gradient_accumulation=1, epochs=2, n_samples=1, do_log=True,
+                 librosa_audio_mel=False, deterministic=False, n_train_samples=None, n_test_samples=None):
         self.run_name = run_name + '_' + self.random_id()
         self.dataset = dataset
         self.train_batch_size = train_batch_size
@@ -31,7 +31,8 @@ class TrainingConfig:
         self.checkpoint_interval = checkpoint_interval
         self.updates_per_evaluation = updates_per_evaluation
         self.updates_per_train_log_commit = updates_per_train_log_commit
-        self.gradient_accumulation = gradient_accumulation
+        self.disc_gradient_accumulation = disc_gradient_accumulation
+        self.gen_gradient_accumulation = gen_gradient_accumulation
 
         self.epochs = epochs
         self.n_samples = n_samples
