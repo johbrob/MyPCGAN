@@ -35,22 +35,25 @@ class WhisperEncoder:
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state
         return output
 
+import GPUtil
 class WhisperEncoderForMelGanMels(WhisperEncoder):
     def __init__(self, config, device):
         super().__init__(config, device)
 
 
     def __call__(self, data, *args, **kwargs):
-
+        GPUtil.showUtilization()
         data = self._pad(data)
+        GPUtil.showUtilization()
         data = self._preprocess(data)
-
+        GPUtil.showUtilization()
         if data.shape[0] == 1 and data.dim() == 3:
             data = data.repeat(2, 1, 1)
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
             output = output[0]
         else:
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
+            GPUtil.showUtilization()
         return output
 
     def _pad(self, data):
