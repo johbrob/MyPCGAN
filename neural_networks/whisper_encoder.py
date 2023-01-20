@@ -54,6 +54,9 @@ class WhisperEncoderForMelGanMels(WhisperEncoder):
         else:
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
             GPUtil.showUtilization()
+            del output
+            GPUtil.showUtilization()
+            output = None
         return output
 
     def _pad(self, data):
