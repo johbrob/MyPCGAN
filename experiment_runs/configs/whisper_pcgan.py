@@ -24,7 +24,7 @@ Q = [
         training_config=TrainingConfig(
             run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000,
             train_batch_size=16, test_batch_size=16, do_log=False, deterministic=False,
-            gradient_accumulation=4, save_interval=10, checkpoint_interval=10,
+            disc_gradient_accumulation=4, gen_gradient_accumulation=16, save_interval=10, checkpoint_interval=10,
             updates_per_train_log_commit=10, updates_per_evaluation=200, test_num_workers=0,
             # n_train_samples=128, n_test_samples=64
         ),

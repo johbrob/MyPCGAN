@@ -10,11 +10,13 @@ class OptimizerUpdater:
 
     def step(self, total_steps, losses):
         if total_steps % self.disc_ga == 0:
+            print('update disc')
             utils.backward(losses)
             utils.step(self.disc_optimizers)
             utils.zero_grad(self.disc_optimizers)
 
         if total_steps % self.gen_ga == 0:
+            print('update gen')
             utils.backward(losses)
             utils.step(self.gen_optimizers)
             utils.zero_grad(self.gen_optimizers)
