@@ -237,14 +237,19 @@ class WhisperPcgan:
 
     def forward_pass(self, audio, secrets, labels):
         mels = self.preprocess(audio)
+        print('forward_pass')
         GPUtil.showUtilization()
         filter_gen_output = self._filter_gen_forward_pass(mels, secrets)
+        print('filter_gen_forward_pass')
         GPUtil.showUtilization()
         secret_gen_output = self._secret_gen_forward_pass(mels, filter_gen_output['filtered_mel'])
+        print('secret_gen_forward_pass')
         GPUtil.showUtilization()
         filter_disc_output = self._filter_disc_forward_pass(mels, filter_gen_output['filtered_mel'])
+        print('filter_disc_forward_pass')
         GPUtil.showUtilization()
         secret_disc_output = self._secret_disc_forward_pass(mels, secret_gen_output['faked_mel'])
+        print('secret_disc_forward_pass')
         GPUtil.showUtilization()
 
         # label_preds = self.label_classifier(secret_gen_output['faked_mel'])
@@ -252,9 +257,11 @@ class WhisperPcgan:
         # secret_disc_output.update({'label_score': label_preds, 'secret_score': secret_preds})
         losses = compute_losses(self.loss_funcs, mels, secrets, filter_gen_output, filter_disc_output,
                                 secret_gen_output, secret_disc_output, self.loss_config)
+        print('compute_losses')
         GPUtil.showUtilization()
         batch_metrics = compute_metrics(mels, secrets, labels, filter_gen_output, filter_disc_output, secret_gen_output,
                                         secret_disc_output, losses, self.loss_funcs)
+        print('compute_metrics')
         GPUtil.showUtilization()
         return batch_metrics, losses
 
