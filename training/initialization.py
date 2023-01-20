@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import utils
 import log
+import GPUtil
 
 dataset_to_name = {
     AvailableDatasets.AudioMNIST: 'DAIS - AudioMNIST',
@@ -19,6 +20,7 @@ class TrainingConfig:
                  checkpoint_interval=1, updates_per_evaluation=50, updates_per_train_log_commit=10,
                  disc_gradient_accumulation=1, gen_gradient_accumulation=1, epochs=2, n_samples=1, do_log=True,
                  librosa_audio_mel=False, deterministic=False, n_train_samples=None, n_test_samples=None):
+
         self.run_name = run_name + '_' + self.random_id()
         self.dataset = dataset
         self.train_batch_size = train_batch_size
@@ -73,7 +75,7 @@ def create_model_from_config(config):
 
 def init_training(experiment_setup, device):
     # load dataset
-
+    GPUtil.showUtilization()
     train_data, test_data = get_dataset(experiment_setup.training.dataset,
                                         n_train_samples=experiment_setup.training.n_train_samples,
                                         n_test_samples=experiment_setup.training.n_test_samples)
@@ -93,7 +95,7 @@ def init_training(experiment_setup, device):
     test_loader = DataLoader(dataset=test_data, batch_size=experiment_setup.training.test_batch_size,
                              num_workers=experiment_setup.training.test_num_workers,
                              shuffle=experiment_setup.training.do_test_shuffle)
-
+    GPUtil.showUtilization()
     # init Audio/Mel-converter
     # if experiment_setup.training.librosa_audio_mel:
     #     audio_mel_converter = AudioMelConverter(experiment_setup.audio_mel)
@@ -114,7 +116,7 @@ def init_training(experiment_setup, device):
 
     # init models etc etc
     architecture = create_architecture_from_config(experiment_setup.architecture, device)
-
+    GPUtil.showUtilization()
     # init wandb
     if experiment_setup.training.do_log:
         log.init(utils.nestedConfigs2dict(experiment_setup), project=dataset_to_name[experiment_setup.training.dataset],
