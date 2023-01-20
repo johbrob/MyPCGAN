@@ -16,7 +16,7 @@ class ModelConfig:
 Q = [
     ExperimentSetup(
         training_config=TrainingConfig(run_name='BASE_entropy', epochs=1000, train_batch_size=128,
-                                       test_batch_size=128, deterministic=False, gradient_accumulation=1,
+                                       test_batch_size=128, deterministic=False,
                                        save_interval=10, checkpoint_interval=10, updates_per_train_log_commit=10,
                                        updates_per_evaluation=50, do_log=True),
         audio_mel_config=AudioMelConfig(pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),

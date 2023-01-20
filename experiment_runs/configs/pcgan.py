@@ -19,7 +19,7 @@ Q = [
     ExperimentSetup(
         training_config=TrainingConfig(
             run_name='BASE_entropy', dataset=AvailableDatasets.CremaD, epochs=1000, train_batch_size=128,
-            test_batch_size=128, deterministic=False, gradient_accumulation=1, save_interval=10, checkpoint_interval=10,
+            test_batch_size=128, deterministic=False, save_interval=10, checkpoint_interval=10,
             updates_per_train_log_commit=10, updates_per_evaluation=50, do_log=True, test_num_workers=0),
         # audio_mel_config=AudioMelConfig(
         #     pretrained_path='neural_networks/pretrained_weights/best_netG_epoch_2120.pt'),
