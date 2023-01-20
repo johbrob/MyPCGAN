@@ -90,7 +90,7 @@ class MelGanAudio2Mel(Audio2Mel, torch.nn.Module):
         # return mel_output
 
     def output_shape(self, audio):
-        print('resamples from 16000 to 22050 when checking output shapes')
+        # print('resamples from 16000 to 22050 when checking output shapes')
         import librosa
         # audio = torch.from_numpy(librosa.resample(y=audio.numpy(), orig_sr=16000, target_sr=22050))
         shape = self(audio).shape

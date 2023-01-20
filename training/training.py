@@ -14,7 +14,7 @@ import os
 def training_loop(train_loader, test_loader, training_config, architecture, device):
     utils.zero_grad(architecture.optimizers)
     total_steps = 0
-    optimizer_updater = OptimizerUpdater(training_config.disc_graident_accumulation, training_config.gen_gradient_accumulation,
+    optimizer_updater = OptimizerUpdater(training_config.disc_gradident_accumulation, training_config.gen_gradient_accumulation,
                                          architecture.disc_optimizers, architecture.gen_optimizers)
 
     save_samples(utils.create_run_subdir(test_loader.dataset.get_name(), training_config.run_name, 'samples'),
