@@ -193,10 +193,24 @@ class WhisperPcgan:
     def _filter_gen_forward_pass(self, mels, secrets):
         import sys
         sys.getsizeof(self.audio_encoder)
-        with torch.no_grad:
+
+        for param in self.audio_encoder.parameters():
+            param.requires_grad = False
+
+        mem_params = sum([param.nelement() * param.element_size() for param in self.audio_encoder.parameters()])
+        mem_bufs = sum([buf.nelement() * buf.element_size() for buf in self.audio_encoder.buffers()])
+        mem = mem_params + mem_bufs  # in bytes
+        print(mem)
+
+        with torch.no_grad():
             mel_encodings = self.audio_encoder(mels)
         sys.getsizeof(self.audio_encoder)
-        sys.getsizeof(mel_encodings)
+
+        mem_params = sum([param.nelement() * param.element_size() for param in self.audio_encoder.parameters()])
+        mem_bufs = sum([buf.nelement() * buf.element_size() for buf in self.audio_encoder.buffers()])
+        mem = mem_params + mem_bufs  # in bytes
+        print(mem)
+        
         print('audio_encoder')
         GPUtil.showUtilization()
         filter_z = torch.randn(mels.shape[0], self.filter_gen.noise_dim).to(mels.device)
