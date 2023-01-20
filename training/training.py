@@ -9,6 +9,7 @@ import tqdm
 import time
 import log
 import os
+import GPUtil
 
 
 def training_loop(train_loader, test_loader, training_config, architecture, device):
@@ -30,13 +31,17 @@ def training_loop(train_loader, test_loader, training_config, architecture, devi
         for i, (audio, secrets, labels, _, _) in tqdm.tqdm(enumerate(train_loader), 'Epoch {}: Training'.format(epoch),
                                                            total=len(train_loader)):
             # data: (bsz x seq_len), secrets: (bsz,), labels: (bsz,)
+            GPUtil.showUtilization()
             step_counter += 1
             total_steps += 1
             labels, secrets = labels.to(device), secrets.to(device)
 
             batch_metrics, losses = architecture.forward_pass(audio, secrets, labels)
+            GPUtil.showUtilization()
             batch_metrics = utils.compile_metrics(batch_metrics)
+            GPUtil.showUtilization()
             metrics = utils.aggregate_metrics(batch_metrics, metrics)
+            GPUtil.showUtilization()
 
             do_log_eval = total_steps % training_config.updates_per_evaluation == 0
             do_log_train = total_steps % training_config.updates_per_train_log_commit == 0
