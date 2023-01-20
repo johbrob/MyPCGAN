@@ -40,45 +40,45 @@ Q = [
             loss_config=LossConfig(filter_gamma=1000, filter_entropy_loss=True, secret_gamma=1000)
         )
     ),
-    ExperimentSetup(
-        training_config=TrainingConfig(
-            run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000,
-            train_batch_size=16, test_batch_size=16, do_log=True, deterministic=False,
-            gradient_accumulation=4, save_interval=10, checkpoint_interval=10,
-            updates_per_train_log_commit=10, updates_per_evaluation=200, test_num_workers=0,
-            # n_train_samples=128, n_test_samples=64
-        ),
-        architecture_config=WhistperPcganConfig(
-            filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
-            filter_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
-            secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
-            secret_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
-            whisper_config=ModelConfig(WhisperEncoderForMelGanMels, WhisperEncoderConfig(WhisperSize.TINY, 16000)),
-            audio2mel_config=ModelConfig(MelGanAudio2Mel, AudioMelConfig(sampling_rate=22050)),
-            mel2audio_config=ModelConfig(MelGanMel2Audio, AudioMelConfig(),
-                                         pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
-            loss_config=LossConfig(filter_gamma=10000, filter_entropy_loss=True, secret_gamma=10000)
-        )
-    ),
-    ExperimentSetup(
-        training_config=TrainingConfig(
-            run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000,
-            train_batch_size=16, test_batch_size=16, do_log=False, deterministic=False,
-            gradient_accumulation=4, save_interval=10, checkpoint_interval=10,
-            updates_per_train_log_commit=10, updates_per_evaluation=200, test_num_workers=0,
-            # n_train_samples=128, n_test_samples=64
-        ),
-        architecture_config=WhistperPcganConfig(
-            filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
-            filter_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
-            secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
-            secret_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
-            whisper_config=ModelConfig(WhisperEncoderForMelGanMels, WhisperEncoderConfig(WhisperSize.TINY, 16000)),
-            audio2mel_config=ModelConfig(MelGanAudio2Mel, AudioMelConfig(sampling_rate=22050)),
-            mel2audio_config=ModelConfig(MelGanMel2Audio, AudioMelConfig(),
-                                         pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
-            loss_config=LossConfig(filter_gamma=1000, filter_entropy_loss=True, secret_gamma=1000,
-                                   filter_dist_loss=torch.nn.MSELoss, secret_dist_loss=torch.nn.MSELoss)
-        )
-    ),
+    # ExperimentSetup(
+    #     training_config=TrainingConfig(
+    #         run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000,
+    #         train_batch_size=16, test_batch_size=16, do_log=True, deterministic=False,
+    #         gradient_accumulation=4, save_interval=10, checkpoint_interval=10,
+    #         updates_per_train_log_commit=10, updates_per_evaluation=200, test_num_workers=0,
+    #         # n_train_samples=128, n_test_samples=64
+    #     ),
+    #     architecture_config=WhistperPcganConfig(
+    #         filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
+    #         filter_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
+    #         secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
+    #         secret_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
+    #         whisper_config=ModelConfig(WhisperEncoderForMelGanMels, WhisperEncoderConfig(WhisperSize.TINY, 16000)),
+    #         audio2mel_config=ModelConfig(MelGanAudio2Mel, AudioMelConfig(sampling_rate=22050)),
+    #         mel2audio_config=ModelConfig(MelGanMel2Audio, AudioMelConfig(),
+    #                                      pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
+    #         loss_config=LossConfig(filter_gamma=10000, filter_entropy_loss=True, secret_gamma=10000)
+    #     )
+    # ),
+    # ExperimentSetup(
+    #     training_config=TrainingConfig(
+    #         run_name='Whisper-PCGAN', dataset=AvailableDatasets.CremaD, epochs=1000,
+    #         train_batch_size=16, test_batch_size=16, do_log=False, deterministic=False,
+    #         gradient_accumulation=4, save_interval=10, checkpoint_interval=10,
+    #         updates_per_train_log_commit=10, updates_per_evaluation=200, test_num_workers=0,
+    #         # n_train_samples=128, n_test_samples=64
+    #     ),
+    #     architecture_config=WhistperPcganConfig(
+    #         filter_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
+    #         filter_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
+    #         secret_gen_config=ModelConfig(UNet, UNetConfig(activation='relu')),
+    #         secret_disc_config=ModelConfig(ResNet18, ResNetConfig(activation='relu')),
+    #         whisper_config=ModelConfig(WhisperEncoderForMelGanMels, WhisperEncoderConfig(WhisperSize.TINY, 16000)),
+    #         audio2mel_config=ModelConfig(MelGanAudio2Mel, AudioMelConfig(sampling_rate=22050)),
+    #         mel2audio_config=ModelConfig(MelGanMel2Audio, AudioMelConfig(),
+    #                                      pretrained_path='neural_networks/pretrained_weights/multi_speaker.pt'),
+    #         loss_config=LossConfig(filter_gamma=1000, filter_entropy_loss=True, secret_gamma=1000,
+    #                                filter_dist_loss=torch.nn.MSELoss, secret_dist_loss=torch.nn.MSELoss)
+    #     )
+    # ),
 ]

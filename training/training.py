@@ -1,7 +1,7 @@
 # from training.utils import preprocess_spectrograms
 # from training.sampling import save_test_samples, generate_samples
 import librosa
-from optimizer_updating import OptimizerUpdater
+from training.optimizer_updating import OptimizerUpdater
 import numpy as np
 import torch
 import utils
