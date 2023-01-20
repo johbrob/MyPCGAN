@@ -36,6 +36,7 @@ class WhisperEncoder:
         return output
 
 import GPUtil
+import gc
 class WhisperEncoderForMelGanMels(WhisperEncoder):
     def __init__(self, config, device):
         super().__init__(config, device)
@@ -52,10 +53,11 @@ class WhisperEncoderForMelGanMels(WhisperEncoder):
             output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
             output = output[0]
         else:
-            # output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
-            self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
+            output = self.whisper_encoder(data.to(self.device), *args, **kwargs).last_hidden_state[:, 0, :]
             GPUtil.showUtilization()
             output = None
+            gc.collect()
+            GPUtil.showUtilization()
         return output
 
     def _pad(self, data):
